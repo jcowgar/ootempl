@@ -1,0 +1,197 @@
+version: 1
+documents:
+  cfg:
+    description: Configuration conventions
+    body_example: |
+      # Summary
+      One-sentence description of the convention this configuration captures.
+
+      ## Standard
+      Detail the default workflow, commands, or expectations.
+
+      ## References
+      - [Optional links to ADRs, rules, or external docs]
+    id_template: "{{domain}}-{{key}}"
+    metadata:
+      fields:
+        domain:
+          type: enum
+          values: [PROJ]
+          required: true
+        key:
+          type: string
+          required: true
+
+  adr:
+    description: Architecture Decision Records
+    body_example: |
+      ## Decision
+      What we are doing (use active voice, be specific).
+
+      ## Context
+      The problem or opportunity that triggered this decision.
+
+      ## Consequences
+      What becomes easier or harder; key trade-offs we're accepting.
+    id_template: "{{sequence:4}}"
+    metadata:
+      fields:
+        status:
+          type: enum
+          values: [Draft, Accepted, Superseded]
+          required: true
+        supersedes:
+          type: string
+          cardinality: many
+
+  rule:
+    description: Governance rules
+    body_example: |
+      Engineers MUST/SHOULD/MAY [specific action or constraint].
+
+      Why: [Brief explanation of the rationale]
+
+      Example: [Optional - only if the rule needs clarification]
+    id_template: "{{domain}}-{{sequence:4}}"
+    metadata:
+      fields:
+        domain:
+          type: string
+          required: true
+
+  note:
+    description: Technical notes and research
+    body_example: |
+      [Unstructured content - findings, explorations, lessons learned, implementation details, etc.]
+    id_template: "{{sequence:4}}"
+
+  epic:
+    description: Project epics with lifecycle management
+    body_example: |
+      ## Vision
+      The human story - what we're building and why it matters.
+
+      ## Discoveries
+      Key findings from exploration phase.
+
+      ## Requirements
+      Final shaped requirements after exploration.
+
+      ## Task Breakdown
+      Links to implementation issues.
+    id_template: "{{sequence:4}}"
+    list_columns:
+      - id
+      - updated
+      - status
+      - title
+    metadata:
+      fields:
+        status:
+          type: enum
+          values: [Planning, Accepted, In-Progress, Completed, Blocked]
+          required: true
+        priority:
+          type: enum
+          values: [High, Medium, Low]
+
+  issue:
+    description: Work items linked to epics
+    body_example: |
+      ## Description
+      What needs to be done and why.
+
+      ## Acceptance Criteria
+      - [ ] Specific measurable outcome
+      - [ ] Another testable requirement
+
+      ## Implementation Notes
+      Technical approach and considerations.
+
+      ## Relevant Context
+      Files, patterns, and documents to reference.
+
+      ## Lessons Learned
+      *Captured during implementation*
+
+      ## Review Feedback
+      *Updated after review phase*
+    id_template: "{{sequence:4}}"
+    list_columns:
+      - id
+      - updated
+      - epic
+      - status
+      - title
+    metadata:
+      fields:
+        epic:
+          type: string
+          required: false
+        status:
+          type: enum
+          values: [Planning, Accepted, In-Progress, Completed, Blocked]
+          required: true
+        priority:
+          type: enum
+          values: [Critical, High, Medium, Low]
+        size:
+          type: enum
+          values: [Small, Medium, Large]
+        complexity:
+          type: enum
+          values: [Low, Medium, High]
+        uncertainty:
+          type: enum
+          values: [Low, Medium, High]
+        dependencies:
+          type: string
+          cardinality: many
+
+  feature:
+    description: Living documentation for a system feature
+    body_example: |
+      ## Summary
+      A high-level overview of the feature and its purpose.
+
+      ## Current State
+      Detailed description of how the feature currently works. This should be kept up-to-date.
+
+      ## Design & Implementation
+      Architectural notes, key implementation details, and links to relevant ADRs or code.
+    id_template: "{{sequence:4}}"
+    metadata:
+      fields:
+        status:
+          type: enum
+          values: [Planning, Active, Deprecated]
+          required: true
+        epics:
+          type: string
+          cardinality: many
+
+  glos:
+    description: Glossary
+    body_example: |
+      [word]: [Concise definition]
+
+      [Optional: Key attributes/structure only if they add real value]
+
+      [Optional: Brief example if it clarifies]
+
+      ## Related (if needed)
+
+      GLOS-DOMAIN-WORD, GLOS-DOMAIN-WORD
+    id_template: "{{word}}"
+    metadata:
+      fields:
+        word:
+          type: string
+          required: true
+
+storage:
+  db:
+    driver: sqlite
+    path: .decree.db
+
+use_storage: db
