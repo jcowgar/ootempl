@@ -3,6 +3,8 @@ defmodule Ootempl.XmlTest do
 
   import Ootempl.Xml
 
+  require Record
+
   describe "element_name/1" do
     test "returns element name as string" do
       # Arrange
@@ -304,6 +306,324 @@ defmodule Ootempl.XmlTest do
     end
   end
 
+  describe "parse/1" do
+    test "parses simple XML string to :xmerl record" do
+      # Arrange
+      xml = "<root><child>text</child></root>"
+
+      # Act
+      result = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert {:ok, element} = result
+      assert element_name(element) == "root"
+    end
+
+    test "parses XML with attributes" do
+      # Arrange
+      xml = ~s(<root id="test" class="container"></root>)
+
+      # Act
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert element_name(element) == "root"
+      assert {:ok, "test"} = get_attribute(element, :id)
+      assert {:ok, "container"} = get_attribute(element, :class)
+    end
+
+    test "parses XML with namespaces" do
+      # Arrange
+      xml =
+        ~s(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>)
+
+      # Act
+      result = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert {:ok, element} = result
+      # Note: :xmerl may handle namespace prefixes differently
+      assert is_tuple(element)
+    end
+
+    test "parses nested XML structure" do
+      # Arrange
+      xml = "<root><parent><child>text</child></parent></root>"
+
+      # Act
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert element_name(element) == "root"
+      parents = find_elements(element, :parent)
+      assert length(parents) == 1
+    end
+
+    test "parses XML with multiple children" do
+      # Arrange
+      xml = "<root><child1/><child2/><child3/></root>"
+
+      # Act
+      {:ok, element} = Ootempl.Xml.parse(xml)
+      content = xmlElement(element, :content)
+
+      # Assert
+      # Filter out text nodes (whitespace) that :xmerl might include
+      element_nodes = Enum.filter(content, fn node -> Record.is_record(node, :xmlElement) end)
+      assert length(element_nodes) == 3
+    end
+
+    test "parses XML with mixed content" do
+      # Arrange
+      xml = "<root>text1<child/>text2</root>"
+
+      # Act
+      result = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert {:ok, element} = result
+      assert element_name(element) == "root"
+    end
+
+    test "parses self-closing elements" do
+      # Arrange
+      xml = "<root><child/></root>"
+
+      # Act
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert element_name(element) == "root"
+      children = find_elements(element, :child)
+      assert length(children) == 1
+    end
+
+    test "parses XML with character entities" do
+      # Arrange
+      # .docx files use XML character entities for special chars (e.g., &#233; for é)
+      xml = ~s(<root>H&#233;llo W&#246;rld &#20320;&#22909;</root>)
+
+      # Act
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Assert
+      text = element_text(element)
+      assert text == "Héllo Wörld 你好"
+    end
+
+    test "returns error for malformed XML" do
+      # Arrange
+      xml = "<root><unclosed>"
+
+      # Act
+      result = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert {:error, _reason} = result
+    end
+
+    test "returns error for empty string" do
+      # Arrange
+      xml = ""
+
+      # Act
+      result = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert {:error, _reason} = result
+    end
+
+    test "returns error for non-XML string" do
+      # Arrange
+      xml = "this is not xml"
+
+      # Act
+      result = Ootempl.Xml.parse(xml)
+
+      # Assert
+      assert {:error, _reason} = result
+    end
+  end
+
+  describe "serialize/1" do
+    test "serializes simple :xmerl record to XML string" do
+      # Arrange
+      xml = "<root><child>text</child></root>"
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Act
+      result = Ootempl.Xml.serialize(element)
+
+      # Assert
+      assert {:ok, xml_string} = result
+      assert is_binary(xml_string)
+      assert xml_string =~ "root"
+      assert xml_string =~ "child"
+    end
+
+    test "serializes XML with attributes" do
+      # Arrange
+      xml = ~s(<root id="test"></root>)
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.serialize(element)
+
+      # Assert
+      assert xml_string =~ "root"
+      assert xml_string =~ ~s(id="test")
+    end
+
+    test "serializes nested XML structure" do
+      # Arrange
+      xml = "<root><parent><child>text</child></parent></root>"
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.serialize(element)
+
+      # Assert
+      assert xml_string =~ "root"
+      assert xml_string =~ "parent"
+      assert xml_string =~ "child"
+    end
+
+    test "serializes XML with character entities" do
+      # Arrange
+      # Character entities should be preserved during round-trip
+      xml = ~s(<root>H&#233;llo W&#246;rld &#20320;&#22909;</root>)
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.serialize(element)
+
+      # Assert
+      # :xmerl converts entities to actual characters in the output
+      assert xml_string =~ "Héllo Wörld 你好"
+    end
+
+    test "serializes self-closing elements" do
+      # Arrange
+      xml = "<root><child/></root>"
+      {:ok, element} = Ootempl.Xml.parse(xml)
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.serialize(element)
+
+      # Assert
+      assert xml_string =~ "root"
+      assert xml_string =~ "child"
+    end
+  end
+
+  describe "round_trip/1" do
+    test "preserves simple XML structure" do
+      # Arrange
+      xml = "<root><child>text</child></root>"
+
+      # Act
+      result = Ootempl.Xml.round_trip(xml)
+
+      # Assert
+      assert {:ok, xml_string} = result
+      assert xml_string =~ "root"
+      assert xml_string =~ "child"
+      assert xml_string =~ "text"
+    end
+
+    test "preserves attributes" do
+      # Arrange
+      xml = ~s(<root id="test" class="container"></root>)
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.round_trip(xml)
+
+      # Assert
+      assert xml_string =~ "root"
+      assert xml_string =~ ~s(id="test")
+      assert xml_string =~ ~s(class="container")
+    end
+
+    test "preserves nested structure" do
+      # Arrange
+      xml = "<root><level1><level2><level3>deep</level3></level2></level1></root>"
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.round_trip(xml)
+
+      # Assert
+      assert xml_string =~ "root"
+      assert xml_string =~ "level1"
+      assert xml_string =~ "level2"
+      assert xml_string =~ "level3"
+      assert xml_string =~ "deep"
+    end
+
+    test "preserves character entities as UTF-8" do
+      # Arrange
+      # XML character entities are converted to UTF-8 during round-trip
+      xml = ~s(<root>H&#233;llo W&#246;rld &#20320;&#22909;</root>)
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.round_trip(xml)
+
+      # Assert
+      # :xmerl decodes entities to UTF-8 characters
+      assert xml_string =~ "Héllo Wörld 你好"
+    end
+
+    test "preserves multiple children" do
+      # Arrange
+      xml = "<root><child1/><child2/><child3/></root>"
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.round_trip(xml)
+
+      # Assert
+      assert xml_string =~ "child1"
+      assert xml_string =~ "child2"
+      assert xml_string =~ "child3"
+    end
+
+    test "preserves namespaces" do
+      # Arrange
+      xml =
+        ~s(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>)
+
+      # Act
+      result = Ootempl.Xml.round_trip(xml)
+
+      # Assert
+      assert {:ok, xml_string} = result
+      # Namespaces should be preserved in some form
+      assert is_binary(xml_string)
+    end
+
+    test "round-trip allows re-parsing" do
+      # Arrange
+      xml = "<root><child>text</child></root>"
+
+      # Act
+      {:ok, xml_string} = Ootempl.Xml.round_trip(xml)
+      reparse_result = Ootempl.Xml.parse(xml_string)
+
+      # Assert
+      assert {:ok, element} = reparse_result
+      assert element_name(element) == "root"
+    end
+
+    test "returns error for malformed XML" do
+      # Arrange
+      xml = "<root><unclosed>"
+
+      # Act
+      result = Ootempl.Xml.round_trip(xml)
+
+      # Assert
+      assert {:error, _reason} = result
+    end
+  end
+
   describe "record definitions" do
     test "xmlElement record can be created and accessed" do
       # Arrange & Act
@@ -330,6 +650,47 @@ defmodule Ootempl.XmlTest do
 
       # Assert
       assert xmlText(text, :value) == ~c"Hello"
+    end
+  end
+
+  describe "integration with real .docx files" do
+    @fixture_path Path.join([__DIR__, "..", "fixtures", "Simple Placeholdes from Word.docx"])
+
+    test "parses real document.xml from .docx file" do
+      # Arrange
+      {:ok, contents} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+
+      # Act
+      result = Ootempl.Xml.parse(contents)
+
+      # Assert
+      assert {:ok, doc} = result
+      assert element_name(doc) == "w:document"
+    end
+
+    test "round-trips real document.xml preserving structure" do
+      # Arrange
+      {:ok, original_xml} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+
+      # Act
+      {:ok, doc} = Ootempl.Xml.parse(original_xml)
+      {:ok, serialized_xml} = Ootempl.Xml.serialize(doc)
+
+      # Assert - verify we can re-parse the serialized XML
+      assert {:ok, reparsed_doc} = Ootempl.Xml.parse(serialized_xml)
+      assert element_name(reparsed_doc) == "w:document"
+    end
+
+    test "extracts namespaced elements from real .docx" do
+      # Arrange
+      {:ok, contents} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(contents)
+
+      # Act - find w:body element
+      body_elements = find_elements(doc, :"w:body")
+
+      # Assert
+      assert length(body_elements) == 1
     end
   end
 

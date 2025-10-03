@@ -33,8 +33,6 @@ defmodule Ootempl.Archive do
          {:ok, temp_dir} <- create_temp_dir(),
          {:ok, _files} <- unzip_to_dir(docx_path, temp_dir) do
       {:ok, temp_dir}
-    else
-      {:error, reason} -> {:error, reason}
     end
   end
 

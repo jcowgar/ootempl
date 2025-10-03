@@ -12,6 +12,23 @@ defmodule Ootempl.Xml do
   - `:xmlAttribute` - XML attribute nodes
   - `:xmlText` - XML text content nodes
 
+  ## Parsing and Serialization
+
+  Parse XML strings into :xmerl record structures:
+
+      {:ok, doc} = Ootempl.Xml.parse("<root><child>text</child></root>")
+
+  Serialize :xmerl records back to XML strings:
+
+      {:ok, xml_string} = Ootempl.Xml.serialize(doc)
+
+  Round-trip parsing and serialization (useful for testing):
+
+      {:ok, xml_string} = Ootempl.Xml.round_trip("<root><child>text</child></root>")
+
+  All parsing and serialization functions handle XML namespaces correctly,
+  which is essential for .docx files that use namespaces extensively (w:, r:, etc.).
+
   ## Usage
 
   To use the record macros in your code, you need to import them:
@@ -45,6 +62,89 @@ defmodule Ootempl.Xml do
   @type xml_node :: xml_element() | xml_text()
 
   @doc """
+  Parses an XML string into :xmerl record structures.
+
+  Uses `:xmerl_scan.string/2` with namespace conformant parsing to correctly
+  handle .docx XML which uses namespaces extensively (w:, r:, etc.).
+
+  Returns `{:ok, document}` on success, or `{:error, reason}` if parsing fails.
+
+  ## Examples
+
+      iex> Ootempl.Xml.parse("<root><child>text</child></root>")
+      {:ok, {...}}
+
+      iex> Ootempl.Xml.parse("<root><unclosed>")
+      {:error, _}
+  """
+  @spec parse(String.t()) :: {:ok, xml_element()} | {:error, term()}
+  def parse(xml_string) when is_binary(xml_string) do
+    # :xmerl_scan.string/2 expects a charlist
+    # Note: :xmerl has limited UTF-8 support; non-ASCII characters may need
+    # the XML declaration with encoding="UTF-8" to parse correctly
+    charlist = String.to_charlist(xml_string)
+    {doc, _rest} = :xmerl_scan.string(charlist, namespace_conformant: true)
+    {:ok, doc}
+  rescue
+    e -> {:error, e}
+  catch
+    :exit, reason -> {:error, reason}
+  end
+
+  @doc """
+  Serializes :xmerl record structures back to an XML string.
+
+  Uses `:xmerl.export_simple/2` to convert the internal representation back
+  to XML, preserving namespaces and attributes.
+
+  Returns `{:ok, xml_string}` on success, or `{:error, reason}` if serialization fails.
+
+  ## Examples
+
+      iex> {:ok, doc} = Ootempl.Xml.parse("<root><child>text</child></root>")
+      iex> Ootempl.Xml.serialize(doc)
+      {:ok, "<?xml version=..."}
+  """
+  @spec serialize(xml_element()) :: {:ok, String.t()} | {:error, term()}
+  def serialize(xml_record) do
+    xml_iodata =
+      xml_record
+      |> List.wrap()
+      |> :xmerl.export_simple(:xmerl_xml)
+
+    # Use :unicode.characters_to_binary to handle Unicode codepoints properly
+    # :xmerl.export_simple can return iodata with Unicode codepoints > 255
+    xml_string = :unicode.characters_to_binary(xml_iodata)
+
+    {:ok, xml_string}
+  rescue
+    e -> {:error, e}
+  catch
+    :exit, reason -> {:error, reason}
+  end
+
+  @doc """
+  Round-trip test helper: parses XML then serializes it back.
+
+  Useful for testing that parsing and serialization preserve XML structure,
+  namespaces, and attributes.
+
+  Returns `{:ok, xml_string}` on success, or `{:error, reason}` if either
+  parsing or serialization fails.
+
+  ## Examples
+
+      iex> Ootempl.Xml.round_trip("<root><child>text</child></root>")
+      {:ok, "<?xml version=..."}
+  """
+  @spec round_trip(String.t()) :: {:ok, String.t()} | {:error, term()}
+  def round_trip(xml_string) do
+    with {:ok, doc} <- parse(xml_string) do
+      serialize(doc)
+    end
+  end
+
+  @doc """
   Returns the name of an XML element as a string.
 
   Converts the atom name to a string, preserving namespaces.
@@ -74,7 +174,7 @@ defmodule Ootempl.Xml do
   def element_text(element) do
     element
     |> xmlElement(:content)
-    |> Enum.filter(&is_text_node?/1)
+    |> Enum.filter(&text_node?/1)
     |> Enum.map_join(&text_value/1)
   end
 
@@ -93,7 +193,7 @@ defmodule Ootempl.Xml do
     element
     |> xmlElement(:content)
     |> Enum.filter(fn node ->
-      is_element_node?(node) && xmlElement(node, :name) == name
+      element_node?(node) && xmlElement(node, :name) == name
     end)
   end
 
@@ -121,13 +221,13 @@ defmodule Ootempl.Xml do
 
   # Private helpers
 
-  @spec is_element_node?(xml_node()) :: boolean()
-  defp is_element_node?(node) do
+  @spec element_node?(xml_node()) :: boolean()
+  defp element_node?(node) do
     Record.is_record(node, :xmlElement)
   end
 
-  @spec is_text_node?(xml_node()) :: boolean()
-  defp is_text_node?(node) do
+  @spec text_node?(xml_node()) :: boolean()
+  defp text_node?(node) do
     Record.is_record(node, :xmlText)
   end
 
