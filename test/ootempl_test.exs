@@ -1,5 +1,6 @@
 defmodule OotemplTest do
   use ExUnit.Case
+
   doctest Ootempl
 
   test "greets the world" do

@@ -75,8 +75,7 @@ defmodule Ootempl.Xml do
     element
     |> xmlElement(:content)
     |> Enum.filter(&is_text_node?/1)
-    |> Enum.map(&text_value/1)
-    |> Enum.join()
+    |> Enum.map_join(&text_value/1)
   end
 
   @doc """

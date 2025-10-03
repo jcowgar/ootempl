@@ -21,7 +21,9 @@ defmodule Ootempl.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:styler, "~> 1.9", only: [:dev, :test], runtime: false}
     ]
   end
 end
