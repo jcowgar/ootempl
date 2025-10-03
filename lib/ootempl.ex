@@ -44,7 +44,9 @@ defmodule Ootempl do
   - `Ootempl.MalformedXMLError` - XML parsing failures
   """
 
-  alias Ootempl.{Archive, Validator, Xml}
+  alias Ootempl.Archive
+  alias Ootempl.Validator
+  alias Ootempl.Xml
 
   @doc """
   Renders a .docx template with data to generate an output document.
@@ -181,8 +183,7 @@ defmodule Ootempl do
     case File.ls(current_dir) do
       {:ok, entries} ->
         file_map =
-          entries
-          |> Enum.reduce(%{}, fn entry, acc ->
+          Enum.reduce(entries, %{}, fn entry, acc ->
             process_entry(base_dir, current_dir, entry, acc)
           end)
 

@@ -85,7 +85,8 @@ defmodule OotemplTest do
 
       # Get temp directories before
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -94,7 +95,8 @@ defmodule OotemplTest do
 
       # Assert - no new temp directories left behind
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -240,7 +242,8 @@ defmodule OotemplTest do
 
       # Get temp directories before
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -253,7 +256,8 @@ defmodule OotemplTest do
 
       # Verify no temp directories leaked
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -267,7 +271,8 @@ defmodule OotemplTest do
 
       # Get temp directories before
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -282,7 +287,8 @@ defmodule OotemplTest do
 
       # Verify no temp directories leaked
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -377,7 +383,8 @@ defmodule OotemplTest do
       temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
 
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -394,7 +401,8 @@ defmodule OotemplTest do
 
       # Verify cleanup happened
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -409,11 +417,12 @@ defmodule OotemplTest do
 
       test_cases = [
         # Malformed XML - fails at parsing
-        {"test/fixtures/malformed_for_cleanup.docx", %{
-          "word/document.xml" => "<bad><xml>",
-          "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
-          "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
-        }}
+        {"test/fixtures/malformed_for_cleanup.docx",
+         %{
+           "word/document.xml" => "<bad><xml>",
+           "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+           "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+         }}
       ]
 
       temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
@@ -426,7 +435,8 @@ defmodule OotemplTest do
         on_exit(fn -> File.rm(test_file) end)
 
         temp_dirs_before =
-          Path.wildcard(temp_dir_pattern)
+          temp_dir_pattern
+          |> Path.wildcard()
           |> Enum.filter(&File.dir?/1)
           |> length()
 
@@ -437,7 +447,8 @@ defmodule OotemplTest do
         assert {:error, _} = result
 
         temp_dirs_after =
-          Path.wildcard(temp_dir_pattern)
+          temp_dir_pattern
+          |> Path.wildcard()
           |> Enum.filter(&File.dir?/1)
           |> length()
 

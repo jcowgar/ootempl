@@ -1,6 +1,4 @@
 defmodule Ootempl.Integration.RenderTest do
-  use ExUnit.Case
-
   @moduledoc """
   Integration tests for the Ootempl.render/3 API.
 
@@ -8,6 +6,8 @@ defmodule Ootempl.Integration.RenderTest do
   ensuring the complete workflow works correctly: template loading,
   XML parsing, serialization, and output generation.
   """
+
+  use ExUnit.Case
 
   @test_fixture "test/fixtures/Simple Placeholdes from Word.docx"
   @output_path "test/fixtures/integration_output.docx"
@@ -204,7 +204,8 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Get temp directory count before
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -213,7 +214,8 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert - no new temp directories left
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
