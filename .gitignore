@@ -22,4 +22,7 @@ ootempl-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+# Test output files that are regenerated
+test/fixtures/manual_verification.docx
+
 .decree.db
