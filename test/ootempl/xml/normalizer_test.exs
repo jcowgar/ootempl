@@ -605,6 +605,194 @@ defmodule Ootempl.Xml.NormalizerTest do
     end
   end
 
+  describe "placeholder replacement" do
+    @test_name "Marty McFly"
+    @test_date "October 21, 2015"  # The date Marty travels to in Back to the Future II
+    @output_path_temp "test/fixtures/replacement_test_output.docx"
+    @output_path_manual "test/fixtures/manual_inspection_output.docx"
+
+    test "replaces placeholders in normalized document" do
+      # Arrange
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - normalize
+      normalized_doc = Normalizer.normalize(doc)
+
+      # Serialize and do simple string replacement
+      {:ok, serialized} = Ootempl.Xml.serialize(normalized_doc)
+
+      # Replace placeholders with actual values
+      replaced_xml = serialized
+        |> String.replace("@person.first_name@", @test_name)
+        |> String.replace("@date@", @test_date)
+
+      # Save to temp output file
+      output_path = @output_path_temp
+
+      # Extract the full template to a temp dir
+      {:ok, temp_dir} = Ootempl.Archive.extract(@fixture_path)
+
+      try do
+        # Write the modified document.xml
+        document_path = Path.join(temp_dir, "word/document.xml")
+        File.write!(document_path, replaced_xml)
+
+        # Collect all files from temp dir
+        {:ok, file_map} = build_file_map_for_test(temp_dir)
+
+        # Create the output .docx
+        :ok = Ootempl.Archive.create(file_map, output_path)
+
+        # Assert - verify file was created and contains expected content
+        assert File.exists?(output_path)
+
+        # Extract and verify the content
+        {:ok, result_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+        {:ok, result_doc} = Ootempl.Xml.parse(result_xml)
+
+        # Extract all text from the document
+        bodies = Ootempl.Xml.find_elements(result_doc, :"w:body")
+        body = hd(bodies)
+        paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
+
+        all_text =
+          paragraphs
+          |> Enum.flat_map(fn para ->
+            para
+            |> Ootempl.Xml.find_elements(:"w:r")
+            |> Enum.map(&extract_text_from_run/1)
+          end)
+          |> Enum.join("")
+
+        # Assert replacements were made correctly
+        assert String.contains?(all_text, @test_name)
+        assert String.contains?(all_text, @test_date)
+
+        # Verify NO placeholders remain
+        refute String.contains?(all_text, "@person.first_name@")
+        refute String.contains?(all_text, "@date@")
+
+        # Verify the complete expected sentence
+        expected_text = "Hello #{@test_name}, how are you on this #{@test_date}?"
+        assert String.contains?(all_text, expected_text)
+      after
+        # Cleanup
+        Ootempl.Archive.cleanup(temp_dir)
+        File.rm(output_path)
+      end
+    end
+
+    @tag :manual
+    test "creates inspection file with replaced placeholders" do
+      # Arrange
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - normalize
+      normalized_doc = Normalizer.normalize(doc)
+
+      # Serialize and do simple string replacement
+      {:ok, serialized} = Ootempl.Xml.serialize(normalized_doc)
+
+      # Replace placeholders with actual values
+      replaced_xml = serialized
+        |> String.replace("@person.first_name@", @test_name)
+        |> String.replace("@date@", @test_date)
+
+      # Save to manual inspection file
+      output_path = @output_path_manual
+
+      # Extract the full template to a temp dir
+      {:ok, temp_dir} = Ootempl.Archive.extract(@fixture_path)
+
+      try do
+        # Write the modified document.xml
+        document_path = Path.join(temp_dir, "word/document.xml")
+        File.write!(document_path, replaced_xml)
+
+        # Collect all files from temp dir
+        {:ok, file_map} = build_file_map_for_test(temp_dir)
+
+        # Create the output .docx
+        :ok = Ootempl.Archive.create(file_map, output_path)
+
+        IO.puts("""
+
+        ========================================
+        MANUAL INSPECTION FILE CREATED
+        ========================================
+
+        Output file saved to:
+        #{Path.expand(output_path)}
+
+        Replacements made:
+        - @person.first_name@ → #{@test_name}
+        - @date@ → #{@test_date}
+
+        Please open in Microsoft Word to verify:
+        1. File opens without errors
+        2. Placeholders are replaced correctly
+        3. Text appears as: "Hello #{@test_name}, how are you on this #{@test_date}?"
+        4. No corruption warnings
+
+        To run this test:
+        mix test --only manual test/ootempl/xml/normalizer_test.exs
+
+        ========================================
+        """)
+
+        # Assert - just verify file was created
+        assert File.exists?(output_path)
+      after
+        # Cleanup temp directory
+        Ootempl.Archive.cleanup(temp_dir)
+      end
+    end
+
+    # Helper for this manual test
+    defp build_file_map_for_test(temp_dir) do
+      case gather_files_for_test(temp_dir, temp_dir) do
+        {:ok, file_map} -> {:ok, file_map}
+        {:error, reason} -> {:error, {:build_file_map_failed, reason}}
+      end
+    end
+
+    defp gather_files_for_test(base_dir, current_dir) do
+      case File.ls(current_dir) do
+        {:ok, entries} ->
+          file_map =
+            Enum.reduce(entries, %{}, fn entry, acc ->
+              full_path = Path.join(current_dir, entry)
+              relative_path = Path.relative_to(full_path, base_dir)
+
+              cond do
+                File.regular?(full_path) ->
+                  case File.read(full_path) do
+                    {:ok, content} -> Map.put(acc, relative_path, content)
+                    {:error, _} -> acc
+                  end
+
+                File.dir?(full_path) ->
+                  case gather_files_for_test(base_dir, full_path) do
+                    {:ok, nested_map} -> Map.merge(acc, nested_map)
+                    {:error, _} -> acc
+                  end
+
+                true ->
+                  acc
+              end
+            end)
+
+          {:ok, file_map}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+
+  end
+
   # Test helpers
 
   defp create_paragraph(runs) do
