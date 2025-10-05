@@ -404,6 +404,207 @@ defmodule Ootempl.Xml.NormalizerTest do
     end
   end
 
+  describe "integration with real .docx fixture" do
+    @fixture_path "test/fixtures/Simple Placeholdes from Word.docx"
+
+    test "detects fragmented placeholders in real Word document" do
+      # Arrange - load the real document
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - normalize the document
+      normalized_doc = Normalizer.normalize(doc)
+
+      # Assert - find body, then paragraphs and extract text
+      bodies = Ootempl.Xml.find_elements(normalized_doc, :"w:body")
+      assert length(bodies) > 0, "Should find w:body element"
+
+      body = hd(bodies)
+      paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
+
+      # Collect all text from all paragraphs
+      all_text =
+        paragraphs
+        |> Enum.flat_map(fn para ->
+          para
+          |> Ootempl.Xml.find_elements(:"w:r")
+          |> Enum.map(&extract_text_from_run/1)
+        end)
+        |> Enum.join("")
+
+      # Should detect both placeholders
+      placeholders = Ootempl.Placeholder.detect(all_text)
+      placeholder_variables = Enum.map(placeholders, & &1.variable)
+
+      assert "person.first_name" in placeholder_variables
+      assert "date" in placeholder_variables
+    end
+
+    test "original document has fragmented placeholder structure" do
+      # Arrange - load the original document WITHOUT normalization
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - find body, then paragraphs with the fragmented placeholder pattern
+      bodies = Ootempl.Xml.find_elements(doc, :"w:body")
+      body = hd(bodies)
+      paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
+
+      # Look for paragraph containing the fragmented @person.first_name@ pattern
+      fragmented_para =
+        Enum.find(paragraphs, fn para ->
+          runs = Ootempl.Xml.find_elements(para, :"w:r")
+          texts = Enum.map(runs, &extract_text_from_run/1)
+          combined = Enum.join(texts, "")
+
+          # Should contain the placeholder but split across runs
+          String.contains?(combined, "person.first") and String.contains?(combined, "_name@")
+        end)
+
+      # Assert - found the fragmented paragraph
+      assert fragmented_para != nil, "Should find paragraph with fragmented @person.first_name@"
+
+      # Verify it's actually fragmented (multiple runs, not in a single run)
+      runs = Ootempl.Xml.find_elements(fragmented_para, :"w:r")
+      texts = Enum.map(runs, &extract_text_from_run/1)
+
+      # No single run should contain the complete placeholder
+      refute Enum.any?(texts, &String.contains?(&1, "@person.first_name@")),
+        "Placeholder should be fragmented across runs, not in single run"
+
+      # But the combined text should contain it
+      combined = Enum.join(texts, "")
+      assert String.contains?(combined, "person.first") and String.contains?(combined, "_name@")
+    end
+
+    test "normalization collapses fragmented @person.first_name@ placeholder" do
+      # Arrange
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - normalize
+      normalized_doc = Normalizer.normalize(doc)
+
+      # Assert - find body, then the paragraph with @person.first_name@
+      bodies = Ootempl.Xml.find_elements(normalized_doc, :"w:body")
+      body = hd(bodies)
+      paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
+
+      target_para =
+        Enum.find(paragraphs, fn para ->
+          runs = Ootempl.Xml.find_elements(para, :"w:r")
+          texts = Enum.map(runs, &extract_text_from_run/1)
+          Enum.any?(texts, &String.contains?(&1, "person.first_name"))
+        end)
+
+      assert target_para != nil, "Should find paragraph containing person.first_name"
+
+      # After normalization, the text containing the placeholder should be in fewer runs
+      runs = Ootempl.Xml.find_elements(target_para, :"w:r")
+      texts = Enum.map(runs, &extract_text_from_run/1)
+
+      # Find text containing complete placeholder
+      placeholder_text = Enum.find(texts, &String.contains?(&1, "@person.first_name@"))
+
+      assert placeholder_text != nil,
+        "After normalization, @person.first_name@ should be in a single run"
+
+      # Verify it's detectable
+      placeholders = Ootempl.Placeholder.detect(placeholder_text)
+      assert length(placeholders) >= 1
+      assert Enum.any?(placeholders, &(&1.variable == "person.first_name"))
+    end
+
+    test "normalization preserves @date@ placeholder" do
+      # Arrange
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - normalize
+      normalized_doc = Normalizer.normalize(doc)
+
+      # Assert - find body, extract all text and verify @date@ is detectable
+      bodies = Ootempl.Xml.find_elements(normalized_doc, :"w:body")
+      body = hd(bodies)
+      paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
+
+      all_text =
+        paragraphs
+        |> Enum.flat_map(fn para ->
+          para
+          |> Ootempl.Xml.find_elements(:"w:r")
+          |> Enum.map(&extract_text_from_run/1)
+        end)
+        |> Enum.join("")
+
+      assert String.contains?(all_text, "@date@")
+
+      # Verify it's detectable by placeholder detection
+      placeholders = Ootempl.Placeholder.detect(all_text)
+      assert Enum.any?(placeholders, &(&1.variable == "date"))
+    end
+
+    test "normalized document removes proofing errors" do
+      # Arrange
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - normalize
+      normalized_doc = Normalizer.normalize(doc)
+
+      # Assert - find body, verify no w:proofErr elements remain in paragraphs
+      bodies = Ootempl.Xml.find_elements(normalized_doc, :"w:body")
+      body = hd(bodies)
+      paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
+
+      proofing_errors =
+        Enum.flat_map(paragraphs, fn para ->
+          para
+          |> xmlElement(:content)
+          |> Enum.filter(fn node ->
+            Record.is_record(node, :xmlElement) && xmlElement(node, :name) == :"w:proofErr"
+          end)
+        end)
+
+      assert Enum.empty?(proofing_errors),
+        "All proofing error markers should be removed after normalization"
+    end
+
+    test "full round-trip with real fixture preserves structure" do
+      # Arrange
+      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, original_doc} = Ootempl.Xml.parse(xml_content)
+
+      # Act - normalize and serialize
+      normalized_doc = Normalizer.normalize(original_doc)
+      {:ok, serialized} = Ootempl.Xml.serialize(normalized_doc)
+
+      # Assert - can re-parse
+      assert {:ok, reparsed_doc} = Ootempl.Xml.parse(serialized)
+      assert Ootempl.Xml.element_name(reparsed_doc) == "w:document"
+
+      # Placeholders should still be detectable - find body first
+      bodies = Ootempl.Xml.find_elements(reparsed_doc, :"w:body")
+      body = hd(bodies)
+      paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
+
+      all_text =
+        paragraphs
+        |> Enum.flat_map(fn para ->
+          para
+          |> Ootempl.Xml.find_elements(:"w:r")
+          |> Enum.map(&extract_text_from_run/1)
+        end)
+        |> Enum.join("")
+
+      placeholders = Ootempl.Placeholder.detect(all_text)
+      placeholder_variables = Enum.map(placeholders, & &1.variable)
+
+      assert "person.first_name" in placeholder_variables
+      assert "date" in placeholder_variables
+    end
+  end
+
   # Test helpers
 
   defp create_paragraph(runs) do
