@@ -47,6 +47,7 @@ defmodule Ootempl do
   alias Ootempl.Archive
   alias Ootempl.Validator
   alias Ootempl.Xml
+  alias Ootempl.Xml.Normalizer
 
   @doc """
   Renders a .docx template with data to generate an output document.
@@ -128,7 +129,8 @@ defmodule Ootempl do
   defp process_template(temp_dir, output_path) do
     with {:ok, xml_content} <- load_document_xml(temp_dir),
          {:ok, xml_doc} <- Xml.parse(xml_content),
-         {:ok, modified_xml} <- Xml.serialize(xml_doc),
+         normalized_doc <- Normalizer.normalize(xml_doc),
+         {:ok, modified_xml} <- Xml.serialize(normalized_doc),
          :ok <- save_document_xml(temp_dir, modified_xml),
          {:ok, file_map} <- build_file_map(temp_dir) do
       Archive.create(file_map, output_path)
