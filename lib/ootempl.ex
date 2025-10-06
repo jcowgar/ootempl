@@ -14,6 +14,8 @@ defmodule Ootempl do
   - Dynamic table row generation from list data
   - Multi-row table templates for complex layouts
   - Case-insensitive placeholder matching
+  - Process headers, footers, footnotes, and endnotes
+  - Replace placeholders in document properties (title, author, company)
   - Preserve Word formatting (bold, italic, fonts, table borders, shading)
   - Generate valid .docx output files
   - Comprehensive validation and error handling
@@ -89,6 +91,50 @@ defmodule Ootempl do
   | 5x Widget @ $10.00 each |
   | Order 101           |
   | 3x Gadget @ $25.00 each |
+  ```
+
+  ### Document Properties
+
+  Placeholders in document metadata (title, author, company) are automatically replaced.
+  Use this feature to populate document properties from your data.
+
+  ```elixir
+  # Template has placeholders in File > Properties:
+  # - Title: @document_title@
+  # - Author: @author@
+  # - Company: @company_name@
+
+  data = %{
+    "document_title" => "Q4 Financial Report",
+    "author" => "Jane Smith",
+    "company_name" => "Acme Corporation"
+  }
+  Ootempl.render("report_template.docx", data, "Q4_report.docx")
+  #=> :ok
+  # Generated document has Title, Author, and Company fields populated
+  ```
+
+  Supported property fields:
+  - **Core properties**: `dc:title`, `dc:subject`, `dc:description`, `dc:creator`
+  - **App properties**: `Company`, `Manager`
+
+  ### Headers, Footers, Footnotes, and Endnotes
+
+  Placeholders in headers, footers, footnotes, and endnotes are processed just like
+  the main document body:
+
+  ```elixir
+  # Template has:
+  # - Header with: @company_name@ - @document_title@
+  # - Footer with: Page @page@ of @total_pages@
+  # - Footnote with: @footnote_citation@
+
+  data = %{
+    "company_name" => "Acme Corp",
+    "document_title" => "Annual Report",
+    "footnote_citation" => "Source: Annual Review 2025"
+  }
+  Ootempl.render("template.docx", data, "output.docx")
   ```
 
   ## Architecture
@@ -223,15 +269,131 @@ defmodule Ootempl do
 
   @spec process_template(Path.t(), map(), Path.t()) :: :ok | {:error, term()}
   defp process_template(temp_dir, data, output_path) do
-    with {:ok, xml_content} <- load_document_xml(temp_dir),
+    with :ok <- process_single_xml_file(temp_dir, "word/document.xml", data),
+         :ok <- process_header_footer_files(temp_dir, data),
+         :ok <- process_footnote_endnote_files(temp_dir, data),
+         :ok <- process_document_properties(temp_dir, data),
+         {:ok, file_map} <- build_file_map(temp_dir) do
+      Archive.create(file_map, output_path)
+    end
+  end
+
+  # Processes a single XML file through the full replacement pipeline.
+  #
+  # Applies the complete processing pipeline to a single XML file:
+  # - Load XML content
+  # - Parse XML
+  # - Normalize (collapse fragmented placeholders)
+  # - Process tables (if any)
+  # - Replace placeholders
+  # - Serialize back to XML
+  # - Save to disk
+  @spec process_single_xml_file(Path.t(), String.t(), map()) :: :ok | {:error, term()}
+  defp process_single_xml_file(temp_dir, relative_path, data) do
+    file_path = Path.join(temp_dir, relative_path)
+
+    with {:ok, xml_content} <- File.read(file_path),
          {:ok, xml_doc} <- Xml.parse(xml_content),
          normalized_doc <- Normalizer.normalize(xml_doc),
          {:ok, table_processed_doc} <- process_tables(normalized_doc, data),
          {:ok, replaced_doc} <- Replacement.replace_in_document(table_processed_doc, data),
          {:ok, modified_xml} <- Xml.serialize(replaced_doc),
-         :ok <- save_document_xml(temp_dir, modified_xml),
-         {:ok, file_map} <- build_file_map(temp_dir) do
-      Archive.create(file_map, output_path)
+         :ok <- File.write(file_path, modified_xml) do
+      :ok
+    else
+      # PlaceholderError should be returned directly without wrapping
+      {:error, %Ootempl.PlaceholderError{} = error} -> {:error, error}
+      # Other errors are wrapped with context
+      {:error, reason} -> {:error, {:file_processing_failed, relative_path, reason}}
+    end
+  end
+
+  # Discovers and processes all header and footer XML files in the document.
+  #
+  # Finds all `word/header*.xml` and `word/footer*.xml` files using Path.wildcard
+  # and applies the same processing pipeline used for the main document body.
+  #
+  # Missing header/footer files are OK (not all documents have them).
+  @spec process_header_footer_files(Path.t(), map()) :: :ok | {:error, term()}
+  defp process_header_footer_files(temp_dir, data) do
+    header_files = Path.wildcard(Path.join(temp_dir, "word/header*.xml"))
+    footer_files = Path.wildcard(Path.join(temp_dir, "word/footer*.xml"))
+
+    all_files = header_files ++ footer_files
+
+    # Convert absolute paths to relative paths
+    relative_files =
+      Enum.map(all_files, fn file_path ->
+        Path.relative_to(file_path, temp_dir)
+      end)
+
+    # Process each file
+    Enum.reduce_while(relative_files, :ok, fn relative_path, _acc ->
+      case process_single_xml_file(temp_dir, relative_path, data) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # Processes footnotes and endnotes XML files if they exist.
+  #
+  # Finds `word/footnotes.xml` and `word/endnotes.xml` files and applies
+  # the same processing pipeline used for the main document body.
+  # These files use the same w:p/w:r/w:t XML structure as document.xml.
+  #
+  # Missing files are OK (not all documents have footnotes or endnotes).
+  @spec process_footnote_endnote_files(Path.t(), map()) :: :ok | {:error, term()}
+  defp process_footnote_endnote_files(temp_dir, data) do
+    ["word/footnotes.xml", "word/endnotes.xml"]
+    |> Enum.filter(&File.exists?(Path.join(temp_dir, &1)))
+    |> Enum.reduce_while(:ok, fn relative_path, _acc ->
+      case process_single_xml_file(temp_dir, relative_path, data) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # Processes document property files for placeholder replacement.
+  #
+  # Handles `docProps/core.xml` (title, subject, description, creator) and
+  # `docProps/app.xml` (company, manager) files. These files use simpler XML
+  # structures with direct text content rather than Word's paragraph/run structure.
+  #
+  # Missing property files are OK (not all documents have all properties set).
+  @spec process_document_properties(Path.t(), map()) :: :ok | {:error, term()}
+  defp process_document_properties(temp_dir, data) do
+    ["docProps/core.xml", "docProps/app.xml"]
+    |> Enum.filter(&File.exists?(Path.join(temp_dir, &1)))
+    |> Enum.reduce_while(:ok, fn relative_path, _acc ->
+      case process_property_file(temp_dir, relative_path, data) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # Processes a document property XML file using simple text replacement.
+  #
+  # Property files have simpler XML structures with direct text content
+  # (e.g., `<dc:title>@title@</dc:title>`) rather than the complex
+  # w:p/w:r/w:t structure used in the main document. This function uses
+  # the full XML processing pipeline to ensure proper handling.
+  @spec process_property_file(Path.t(), String.t(), map()) :: :ok | {:error, term()}
+  defp process_property_file(temp_dir, relative_path, data) do
+    file_path = Path.join(temp_dir, relative_path)
+
+    with {:ok, xml_content} <- File.read(file_path),
+         {:ok, xml_doc} <- Xml.parse(xml_content),
+         normalized_doc <- Normalizer.normalize(xml_doc),
+         {:ok, replaced_doc} <- Replacement.replace_in_document(normalized_doc, data),
+         {:ok, modified_xml} <- Xml.serialize(replaced_doc),
+         :ok <- File.write(file_path, modified_xml) do
+      :ok
+    else
+      {:error, %Ootempl.PlaceholderError{} = error} -> {:error, error}
+      {:error, reason} -> {:error, {:property_file_processing_failed, relative_path, reason}}
     end
   end
 
@@ -396,26 +558,6 @@ defmodule Ootempl do
 
       true ->
         :ok
-    end
-  end
-
-  @spec load_document_xml(Path.t()) :: {:ok, binary()} | {:error, term()}
-  defp load_document_xml(temp_dir) do
-    document_path = Path.join(temp_dir, "word/document.xml")
-
-    case File.read(document_path) do
-      {:ok, content} -> {:ok, content}
-      {:error, reason} -> {:error, {:read_failed, document_path, reason}}
-    end
-  end
-
-  @spec save_document_xml(Path.t(), String.t()) :: :ok | {:error, term()}
-  defp save_document_xml(temp_dir, xml_content) do
-    document_path = Path.join(temp_dir, "word/document.xml")
-
-    case File.write(document_path, xml_content) do
-      :ok -> :ok
-      {:error, reason} -> {:error, {:write_failed, document_path, reason}}
     end
   end
 

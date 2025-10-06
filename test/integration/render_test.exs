@@ -597,6 +597,122 @@ defmodule Ootempl.Integration.RenderTest do
     end
   end
 
+  describe "header and footer processing" do
+    test "processes documents without headers or footers successfully" do
+      # Arrange - existing fixture has no headers/footers
+      template_path = @test_fixture
+      data = %{
+        "person" => %{"first_name" => "Doc Brown"},
+        "date" => "November 5, 1955"
+      }
+      output_path = @output_path
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert - should work fine even without headers/footers
+      assert result == :ok
+      assert File.exists?(output_path)
+    end
+
+    test "replaces placeholders in document headers" do
+      # Arrange
+      template_path = "test/fixtures/with_header_footer.docx"
+      data = %{
+        "company_name" => "Acme Corp",
+        "footer_text" => "Confidential",
+        "person" => %{"first_name" => "Test"},
+        "date" => "2025"
+      }
+      output_path = "test/fixtures/header_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+
+      # Verify header was processed
+      {:ok, header_xml} = Ootempl.Archive.extract_file(output_path, "word/header1.xml")
+      assert header_xml =~ "Acme Corp"
+      refute header_xml =~ "@company_name@"
+    end
+
+    test "replaces placeholders in document footers" do
+      # Arrange
+      template_path = "test/fixtures/with_header_footer.docx"
+      data = %{
+        "company_name" => "Test Inc",
+        "footer_text" => "Confidential",
+        "person" => %{"first_name" => "Test"},
+        "date" => "2025"
+      }
+      output_path = "test/fixtures/footer_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+
+      # Verify footer was processed
+      {:ok, footer_xml} = Ootempl.Archive.extract_file(output_path, "word/footer1.xml")
+      assert footer_xml =~ "Confidential"
+      refute footer_xml =~ "@footer_text@"
+    end
+
+    test "processes multiple header files (first page, odd/even)" do
+      # Arrange
+      template_path = "test/fixtures/multiple_headers.docx"
+      data = %{
+        "title" => "Document Title",
+        "person" => %{"first_name" => "Test"},
+        "date" => "2025"
+      }
+      output_path = "test/fixtures/multiple_headers_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+
+      # All headers should be processed
+      {:ok, header1} = Ootempl.Archive.extract_file(output_path, "word/header1.xml")
+      {:ok, header2} = Ootempl.Archive.extract_file(output_path, "word/header2.xml")
+
+      assert header1 =~ "Document Title"
+      assert header2 =~ "Document Title"
+    end
+
+    test "reports placeholder errors from headers and footers" do
+      # Arrange - header has @company_name@, footer has @footer_text@
+      template_path = "test/fixtures/with_header_footer.docx"
+      data = %{
+        "person" => %{"first_name" => "Test"},
+        "date" => "2025"
+      }
+      output_path = "test/fixtures/header_error_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert - should return error with placeholder info from header
+      assert {:error, %Ootempl.PlaceholderError{} = error} = result
+      assert length(error.placeholders) > 0
+      placeholders = Enum.map(error.placeholders, & &1.placeholder)
+      assert "@company_name@" in placeholders
+    end
+  end
+
   describe "manual verification guidance" do
     @tag :manual
     test "output can be opened in Microsoft Word (manual verification required)" do
