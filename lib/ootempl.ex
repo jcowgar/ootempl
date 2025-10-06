@@ -11,6 +11,7 @@ defmodule Ootempl do
   - Load and parse .docx templates
   - Replace `@variable@` placeholders with dynamic content
   - Support nested data access with dot notation (`@customer.name@`)
+  - Conditional sections with `@if:condition@...@endif@` syntax
   - Dynamic table row generation from list data
   - Multi-row table templates for complex layouts
   - Case-insensitive placeholder matching
@@ -93,6 +94,44 @@ defmodule Ootempl do
   | 3x Gadget @ $25.00 each |
   ```
 
+  ### Conditional Sections
+
+  Control which sections of your document appear based on data conditions using
+  `@if:condition@...@endif@` markers. Sections are shown when the condition is
+  truthy and hidden when falsy.
+
+  ```elixir
+  # Template structure:
+  # Standard content here.
+  #
+  # @if:show_disclaimer@
+  # DISCLAIMER: This is a legal disclaimer that appears
+  # only when show_disclaimer is true.
+  # @endif@
+  #
+  # @if:include_pricing@
+  # Pricing: $100/month
+  # @endif@
+
+  data = %{
+    "show_disclaimer" => true,
+    "include_pricing" => false
+  }
+  Ootempl.render("contract_template.docx", data, "contract.docx")
+  #=> :ok
+  # Generated document includes disclaimer section, excludes pricing section
+  ```
+
+  **Truthiness rules:**
+  - **Truthy**: non-nil, non-false, non-empty string, non-zero number
+  - **Falsy**: `nil`, `false`, `""` (empty string), `0`, `0.0`
+
+  **Conditional features:**
+  - Case-insensitive markers: `@IF:name@`, `@if:NAME@` both work
+  - Nested data paths: `@if:customer.active@`
+  - Multi-paragraph sections supported
+  - Sections can contain tables, images, lists, etc.
+
   ### Document Properties
 
   Placeholders in document metadata (title, author, company) are automatically replaced.
@@ -146,6 +185,7 @@ defmodule Ootempl do
   - `Ootempl.Xml.Normalizer` - XML normalization for fragmented placeholders
   - `Ootempl.Placeholder` - Placeholder detection and parsing
   - `Ootempl.DataAccess` - Nested data access with case-insensitive matching
+  - `Ootempl.Conditional` - Conditional marker detection, evaluation, and section processing
   - `Ootempl.Replacement` - Placeholder replacement in XML with formatting preservation
   - `Ootempl.Table` - Table structure detection, template row identification, and duplication
   - `Ootempl.Validator` - Document validation and error handling
@@ -166,6 +206,7 @@ defmodule Ootempl do
   """
 
   alias Ootempl.Archive
+  alias Ootempl.Conditional
   alias Ootempl.Replacement
   alias Ootempl.Table
   alias Ootempl.Validator
@@ -284,6 +325,7 @@ defmodule Ootempl do
   # - Load XML content
   # - Parse XML
   # - Normalize (collapse fragmented placeholders)
+  # - Process conditionals (FIRST - before tables and variables)
   # - Process tables (if any)
   # - Replace placeholders
   # - Serialize back to XML
@@ -295,7 +337,8 @@ defmodule Ootempl do
     with {:ok, xml_content} <- File.read(file_path),
          {:ok, xml_doc} <- Xml.parse(xml_content),
          normalized_doc = Normalizer.normalize(xml_doc),
-         {:ok, table_processed_doc} <- process_tables(normalized_doc, data),
+         {:ok, conditional_processed_doc} <- process_conditionals(normalized_doc, data),
+         {:ok, table_processed_doc} <- process_tables(conditional_processed_doc, data),
          {:ok, replaced_doc} <- Replacement.replace_in_document(table_processed_doc, data),
          {:ok, modified_xml} <- Xml.serialize(replaced_doc),
          :ok <- File.write(file_path, modified_xml) do
@@ -395,6 +438,235 @@ defmodule Ootempl do
       {:error, %Ootempl.PlaceholderError{} = error} -> {:error, error}
       {:error, reason} -> {:error, {:property_file_processing_failed, relative_path, reason}}
     end
+  end
+
+  # Processes conditional sections in an XML document.
+  #
+  # Detects all `@if:condition@...@endif@` markers, evaluates conditions,
+  # and either removes sections (when false) or removes markers (when true).
+  #
+  # This must run BEFORE variable replacement to ensure removed sections
+  # don't get processed.
+  @spec process_conditionals(Xml.xml_element(), map()) :: {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_conditionals(xml_doc, data) do
+    # Extract all text to detect conditionals
+    text = extract_all_text_from_doc(xml_doc)
+
+    # Detect all conditional markers
+    conditionals = Conditional.detect_conditionals(text)
+
+    # If no conditionals, return document unchanged
+    if Enum.empty?(conditionals) do
+      {:ok, xml_doc}
+    else
+      # Validate marker pairs
+      case Conditional.validate_pairs(conditionals) do
+        :ok ->
+          # Process all conditional pairs
+          process_all_conditionals(xml_doc, conditionals, data)
+
+        {:error, reason} ->
+          {:error, {:conditional_validation_failed, reason}}
+      end
+    end
+  end
+
+  # Processes all conditional pairs in the document
+  # Re-detects conditionals after each processing step to avoid stale references
+  @spec process_all_conditionals(Xml.xml_element(), [Conditional.conditional()], map()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_all_conditionals(xml_doc, _conditionals, data) do
+    # Process conditionals one at a time, re-detecting after each
+    process_conditionals_iteratively(xml_doc, data)
+  end
+
+  # Iteratively process conditionals, re-detecting after each one
+  @spec process_conditionals_iteratively(Xml.xml_element(), map()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_conditionals_iteratively(xml_doc, data) do
+    # Extract text and detect conditionals
+    text = extract_all_text_from_doc(xml_doc)
+    conditionals = Conditional.detect_conditionals(text)
+
+    # If no conditionals remain, we're done
+    if Enum.empty?(conditionals) do
+      {:ok, xml_doc}
+    else
+      process_detected_conditionals(xml_doc, conditionals, data)
+    end
+  end
+
+  # Processes detected conditionals after validation
+  @spec process_detected_conditionals(Xml.xml_element(), [Conditional.conditional()], map()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_detected_conditionals(xml_doc, conditionals, data) do
+    # Validate pairs
+    case Conditional.validate_pairs(conditionals) do
+      :ok ->
+        process_first_conditional_pair(xml_doc, conditionals, data)
+
+      {:error, reason} ->
+        {:error, {:conditional_validation_failed, reason}}
+    end
+  end
+
+  # Processes the first conditional pair and recurses
+  @spec process_first_conditional_pair(Xml.xml_element(), [Conditional.conditional()], map()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_first_conditional_pair(xml_doc, conditionals, data) do
+    pairs = group_conditional_pairs(conditionals)
+
+    case pairs do
+      [] ->
+        {:ok, xml_doc}
+
+      [first_pair | _rest] ->
+        # Process the first conditional pair
+        case process_single_conditional(xml_doc, first_pair, data) do
+          {:ok, modified_doc} ->
+            # Re-detect and process remaining conditionals
+            process_conditionals_iteratively(modified_doc, data)
+
+          {:error, _reason} = error ->
+            error
+        end
+    end
+  end
+
+  # Groups conditional markers into if/endif pairs
+  @spec group_conditional_pairs([Conditional.conditional()]) ::
+          [%{if: Conditional.conditional(), endif: Conditional.conditional()}]
+  defp group_conditional_pairs(conditionals) do
+    do_group_pairs(conditionals, [], [])
+  end
+
+  @spec do_group_pairs(
+          [Conditional.conditional()],
+          [Conditional.conditional()],
+          [%{if: Conditional.conditional(), endif: Conditional.conditional()}]
+        ) :: [%{if: Conditional.conditional(), endif: Conditional.conditional()}]
+  defp do_group_pairs([], _stack, pairs), do: Enum.reverse(pairs)
+
+  defp do_group_pairs([%{type: :if} = marker | rest], stack, pairs) do
+    do_group_pairs(rest, [marker | stack], pairs)
+  end
+
+  defp do_group_pairs([%{type: :endif} = marker | rest], [if_marker | stack], pairs) do
+    pair = %{if: if_marker, endif: marker}
+    do_group_pairs(rest, stack, [pair | pairs])
+  end
+
+  # Processes a single conditional pair
+  @spec process_single_conditional(
+          Xml.xml_element(),
+          %{if: Conditional.conditional(), endif: Conditional.conditional()},
+          map()
+        ) :: {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_single_conditional(xml_doc, %{if: if_marker, endif: endif_marker} = pair, data) do
+    # Evaluate the condition
+    case Conditional.evaluate_condition(if_marker.path, data) do
+      {:ok, true} ->
+        # Condition is true: keep content, remove markers
+        remove_conditional_markers(xml_doc, pair)
+
+      {:ok, false} ->
+        # Condition is false: remove entire section
+        # Pass both markers to help identify the correct pair
+        remove_conditional_section(xml_doc, if_marker, endif_marker)
+
+      {:error, reason} ->
+        {:error, {:conditional_evaluation_failed, if_marker.condition, reason}}
+    end
+  end
+
+  # Removes conditional markers (when condition is true)
+  @spec remove_conditional_markers(
+          Xml.xml_element(),
+          %{if: Conditional.conditional(), endif: Conditional.conditional()}
+        ) :: {:ok, Xml.xml_element()}
+  defp remove_conditional_markers(xml_doc, %{if: if_marker, endif: _endif_marker}) do
+    # Build marker strings
+    if_marker_text = "@if:#{if_marker.condition}@"
+    endif_marker_text = "@endif@"
+
+    # Find the specific paragraphs containing these markers
+    case Conditional.find_section_boundaries(xml_doc, if_marker_text, endif_marker_text) do
+      {:ok, {start_para, end_para}} ->
+        # Remove only the marker paragraphs (not the content between them)
+        modified_doc = Xml.remove_nodes(xml_doc, [start_para, end_para])
+        {:ok, modified_doc}
+
+      {:error, reason} ->
+        {:error, {:marker_removal_failed, reason}}
+    end
+  end
+
+  # Removes entire conditional section (when condition is false)
+  @spec remove_conditional_section(
+          Xml.xml_element(),
+          Conditional.conditional(),
+          Conditional.conditional()
+        ) :: {:ok, Xml.xml_element()} | {:error, term()}
+  defp remove_conditional_section(xml_doc, if_marker, _endif_marker) do
+    # Build marker strings
+    if_marker_text = "@if:#{if_marker.condition}@"
+    endif_marker_text = "@endif@"
+
+    # Find section boundaries
+    case Conditional.find_section_boundaries(xml_doc, if_marker_text, endif_marker_text) do
+      {:ok, {start_para, end_para}} ->
+        # Find the body element that contains the paragraphs
+        body_element = find_body_element(xml_doc)
+
+        # Collect all nodes in the section from the body
+        case Conditional.collect_section_nodes(body_element, start_para, end_para) do
+          {:ok, nodes_to_remove} ->
+            # Remove all nodes in the section
+            modified_doc = Xml.remove_nodes(xml_doc, nodes_to_remove)
+            {:ok, modified_doc}
+
+          {:error, reason} ->
+            {:error, {:section_boundary_error, reason}}
+        end
+
+      {:error, reason} ->
+        {:error, {:section_boundary_not_found, if_marker.condition, reason}}
+    end
+  end
+
+  # Finds the w:body element in the document
+  @spec find_body_element(Xml.xml_element()) :: Xml.xml_element()
+  defp find_body_element(xml_doc) do
+    import Xml
+    require Record
+
+    children = xmlElement(xml_doc, :content)
+
+    Enum.find(children, fn node ->
+      Record.is_record(node, :xmlElement) and xmlElement(node, :name) == :"w:body"
+    end)
+  end
+
+  # Extracts all text content from the document for conditional detection
+  @spec extract_all_text_from_doc(Xml.xml_element()) :: String.t()
+  defp extract_all_text_from_doc(element) do
+    import Xml
+    require Record
+
+    children = xmlElement(element, :content)
+
+    Enum.map_join(children, fn node ->
+      cond do
+        Record.is_record(node, :xmlText) ->
+          node |> xmlText(:value) |> List.to_string()
+
+        Record.is_record(node, :xmlElement) ->
+          extract_all_text_from_doc(node)
+
+        true ->
+          ""
+      end
+    end)
   end
 
   @spec process_tables(Xml.xml_element(), map()) :: {:ok, Xml.xml_element()} | {:error, term()}

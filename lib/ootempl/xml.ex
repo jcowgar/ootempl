@@ -219,7 +219,97 @@ defmodule Ootempl.Xml do
     end
   end
 
+  @doc """
+  Removes a list of nodes from an XML element.
+
+  Traverses the element's content and removes all nodes that match
+  any node in the `nodes_to_remove` list. This is useful for removing
+  conditional sections when conditions are false.
+
+  ## Parameters
+
+  - `element` - The XML element to process
+  - `nodes_to_remove` - List of nodes to remove from the element
+
+  ## Returns
+
+  The modified XML element with the specified nodes removed.
+
+  ## Examples
+
+      iex> {:ok, doc} = Ootempl.Xml.parse("<root><p>keep</p><p>remove</p></root>")
+      iex> [keep, remove] = Ootempl.Xml.find_elements(doc, :p)
+      iex> modified = Ootempl.Xml.remove_nodes(doc, [remove])
+      iex> Ootempl.Xml.find_elements(modified, :p) |> length()
+      1
+  """
+  @spec remove_nodes(xml_element(), [xml_node()]) :: xml_element()
+  def remove_nodes(element, nodes_to_remove) do
+    content = xmlElement(element, :content)
+    filtered_content = filter_and_recurse(content, nodes_to_remove)
+    xmlElement(element, content: filtered_content)
+  end
+
+  @doc """
+  Removes text nodes containing specific marker text from an XML element.
+
+  Recursively traverses the element and removes any text nodes that contain
+  the specified marker text. This is useful for removing conditional markers
+  when conditions are true (keeping the content but removing the markers).
+
+  ## Parameters
+
+  - `element` - The XML element to process
+  - `marker_text` - The text to search for in text nodes (e.g., "@if:active@")
+
+  ## Returns
+
+  The modified XML element with marker text nodes removed.
+
+  ## Examples
+
+      iex> {:ok, doc} = Ootempl.Xml.parse("<root><p>@if:x@</p><p>keep</p></root>")
+      iex> modified = Ootempl.Xml.remove_text_nodes_containing(doc, "@if:x@")
+      # Text node containing "@if:x@" is removed
+  """
+  @spec remove_text_nodes_containing(xml_element(), String.t()) :: xml_element()
+  def remove_text_nodes_containing(element, marker_text) do
+    content = xmlElement(element, :content)
+    filtered_content = filter_text_nodes(content, marker_text)
+    xmlElement(element, content: filtered_content)
+  end
+
   # Private helpers
+
+  # Filters nodes and recursively processes element children
+  @spec filter_and_recurse([xml_node()], [xml_node()]) :: [xml_node()]
+  defp filter_and_recurse(nodes, nodes_to_remove) do
+    nodes
+    |> Enum.reject(fn node -> node in nodes_to_remove end)
+    |> Enum.map(fn node ->
+      if element_node?(node) do
+        remove_nodes(node, nodes_to_remove)
+      else
+        node
+      end
+    end)
+  end
+
+  # Filters text nodes containing marker text and recursively processes element children
+  @spec filter_text_nodes([xml_node()], String.t()) :: [xml_node()]
+  defp filter_text_nodes(nodes, marker_text) do
+    nodes
+    |> Enum.reject(fn node ->
+      text_node?(node) && String.contains?(text_value(node), marker_text)
+    end)
+    |> Enum.map(fn node ->
+      if element_node?(node) do
+        remove_text_nodes_containing(node, marker_text)
+      else
+        node
+      end
+    end)
+  end
 
   @spec element_node?(xml_node()) :: boolean()
   defp element_node?(node) do
