@@ -616,16 +616,22 @@ defmodule Ootempl.Xml.NormalizerTest do
       {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
       {:ok, doc} = Ootempl.Xml.parse(xml_content)
 
+      # Data for replacement using DataAccess
+      data = %{
+        "person" => %{
+          "first_name" => @test_name
+        },
+        "date" => @test_date
+      }
+
       # Act - normalize
       normalized_doc = Normalizer.normalize(doc)
 
-      # Serialize and do simple string replacement
+      # Serialize and do data-driven replacement
       {:ok, serialized} = Ootempl.Xml.serialize(normalized_doc)
 
-      # Replace placeholders with actual values
-      replaced_xml = serialized
-        |> String.replace("@person.first_name@", @test_name)
-        |> String.replace("@date@", @test_date)
+      # Replace placeholders using DataAccess
+      replaced_xml = replace_placeholders_in_xml(serialized, data)
 
       # Save to temp output file
       output_path = @output_path_temp
@@ -689,16 +695,22 @@ defmodule Ootempl.Xml.NormalizerTest do
       {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
       {:ok, doc} = Ootempl.Xml.parse(xml_content)
 
+      # Data for replacement using DataAccess
+      data = %{
+        "person" => %{
+          "first_name" => @test_name
+        },
+        "date" => @test_date
+      }
+
       # Act - normalize
       normalized_doc = Normalizer.normalize(doc)
 
-      # Serialize and do simple string replacement
+      # Serialize and do data-driven replacement
       {:ok, serialized} = Ootempl.Xml.serialize(normalized_doc)
 
-      # Replace placeholders with actual values
-      replaced_xml = serialized
-        |> String.replace("@person.first_name@", @test_name)
-        |> String.replace("@date@", @test_date)
+      # Replace placeholders using DataAccess
+      replaced_xml = replace_placeholders_in_xml(serialized, data)
 
       # Save to manual inspection file
       output_path = @output_path_manual
@@ -759,38 +771,63 @@ defmodule Ootempl.Xml.NormalizerTest do
     end
 
     defp gather_files_for_test(base_dir, current_dir) do
-      case File.ls(current_dir) do
-        {:ok, entries} ->
-          file_map =
-            Enum.reduce(entries, %{}, fn entry, acc ->
-              full_path = Path.join(current_dir, entry)
-              relative_path = Path.relative_to(full_path, base_dir)
+      with {:ok, entries} <- File.ls(current_dir) do
+        file_map =
+          Enum.reduce(entries, %{}, fn entry, acc ->
+            process_entry_for_test(base_dir, current_dir, entry, acc)
+          end)
 
-              cond do
-                File.regular?(full_path) ->
-                  case File.read(full_path) do
-                    {:ok, content} -> Map.put(acc, relative_path, content)
-                    {:error, _} -> acc
-                  end
-
-                File.dir?(full_path) ->
-                  case gather_files_for_test(base_dir, full_path) do
-                    {:ok, nested_map} -> Map.merge(acc, nested_map)
-                    {:error, _} -> acc
-                  end
-
-                true ->
-                  acc
-              end
-            end)
-
-          {:ok, file_map}
-
-        {:error, reason} ->
-          {:error, reason}
+        {:ok, file_map}
       end
     end
 
+    defp process_entry_for_test(base_dir, current_dir, entry, acc) do
+      full_path = Path.join(current_dir, entry)
+      relative_path = Path.relative_to(full_path, base_dir)
+
+      cond do
+        File.regular?(full_path) ->
+          add_file_to_map_for_test(relative_path, full_path, acc)
+
+        File.dir?(full_path) ->
+          merge_directory_for_test(base_dir, full_path, acc)
+
+        true ->
+          acc
+      end
+    end
+
+    defp add_file_to_map_for_test(relative_path, full_path, acc) do
+      case File.read(full_path) do
+        {:ok, content} -> Map.put(acc, relative_path, content)
+        {:error, _} -> acc
+      end
+    end
+
+    defp merge_directory_for_test(base_dir, full_path, acc) do
+      case gather_files_for_test(base_dir, full_path) do
+        {:ok, nested_map} -> Map.merge(acc, nested_map)
+        {:error, _} -> acc
+      end
+    end
+
+    # Helper for data-driven placeholder replacement
+    defp replace_placeholders_in_xml(xml_string, data) do
+      # Detect all placeholders in the XML
+      placeholders = Ootempl.Placeholder.detect(xml_string)
+
+      # Replace each placeholder with its corresponding value from data
+      Enum.reduce(placeholders, xml_string, fn placeholder, acc ->
+        case Ootempl.DataAccess.get_value(data, placeholder.path) do
+          {:ok, value} ->
+            String.replace(acc, placeholder.original, value)
+
+          {:error, _reason} ->
+            # If value not found, leave placeholder as-is for now
+            acc
+        end
+      end)
+    end
   end
 
   # Test helpers
