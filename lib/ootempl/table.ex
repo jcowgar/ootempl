@@ -45,9 +45,11 @@ defmodule Ootempl.Table do
       grouped = Ootempl.Table.group_template_rows(rows, data)
   """
 
-  require Record
   import Ootempl.Xml
+
   alias Ootempl.Placeholder
+
+  require Record
 
   @type row_analysis :: %{
           row: Ootempl.Xml.xml_element(),
@@ -148,7 +150,7 @@ defmodule Ootempl.Table do
     # Find unique list references
     list_keys =
       placeholders
-      |> Enum.map(fn placeholder -> placeholder.path |> hd() end)
+      |> Enum.map(fn placeholder -> hd(placeholder.path) end)
       |> Enum.filter(fn key -> list_reference?(key, data) end)
       |> Enum.uniq()
 
@@ -510,7 +512,8 @@ defmodule Ootempl.Table do
   @spec find_elements_recursive(Ootempl.Xml.xml_element(), atom()) ::
           [Ootempl.Xml.xml_element()]
   defp find_elements_recursive(element, target_name) do
-    find_elements_recursive_impl(element, target_name, [])
+    element
+    |> find_elements_recursive_impl(target_name, [])
     |> Enum.reverse()
   end
 

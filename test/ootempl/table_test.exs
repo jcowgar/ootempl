@@ -2,6 +2,7 @@ defmodule Ootempl.TableTest do
   use ExUnit.Case, async: true
 
   import Ootempl.Xml
+
   alias Ootempl.Table
 
   @word_ns ~s(xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main")

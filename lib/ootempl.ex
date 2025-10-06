@@ -294,7 +294,7 @@ defmodule Ootempl do
 
     with {:ok, xml_content} <- File.read(file_path),
          {:ok, xml_doc} <- Xml.parse(xml_content),
-         normalized_doc <- Normalizer.normalize(xml_doc),
+         normalized_doc = Normalizer.normalize(xml_doc),
          {:ok, table_processed_doc} <- process_tables(normalized_doc, data),
          {:ok, replaced_doc} <- Replacement.replace_in_document(table_processed_doc, data),
          {:ok, modified_xml} <- Xml.serialize(replaced_doc),
@@ -386,7 +386,7 @@ defmodule Ootempl do
 
     with {:ok, xml_content} <- File.read(file_path),
          {:ok, xml_doc} <- Xml.parse(xml_content),
-         normalized_doc <- Normalizer.normalize(xml_doc),
+         normalized_doc = Normalizer.normalize(xml_doc),
          {:ok, replaced_doc} <- Replacement.replace_in_document(normalized_doc, data),
          {:ok, modified_xml} <- Xml.serialize(replaced_doc),
          :ok <- File.write(file_path, modified_xml) do
@@ -473,11 +473,10 @@ defmodule Ootempl do
   end
 
   @spec handle_template_row(Table.row_analysis(), non_neg_integer(), [map()]) :: [map()]
-  defp handle_template_row(analysis, index, []), do:
-    [%{rows: [analysis.row], list_key: analysis.list_key, position: index}]
+  defp handle_template_row(analysis, index, []),
+    do: [%{rows: [analysis.row], list_key: analysis.list_key, position: index}]
 
-  defp handle_template_row(analysis, _index, [current | rest])
-       when current.list_key == analysis.list_key do
+  defp handle_template_row(analysis, _index, [current | rest]) when current.list_key == analysis.list_key do
     updated_current = %{current | rows: current.rows ++ [analysis.row]}
     [updated_current | rest]
   end
@@ -522,7 +521,7 @@ defmodule Ootempl do
   @spec replace_element_in_tree(Xml.xml_element(), Xml.xml_element(), Xml.xml_element()) ::
           Xml.xml_element()
   defp replace_element_in_tree(element, old_element, new_element) do
-    import Ootempl.Xml
+    import Xml
 
     # If this is the element to replace, return the new one
     if element == old_element do

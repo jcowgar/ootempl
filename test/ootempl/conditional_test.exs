@@ -1,8 +1,13 @@
 defmodule Ootempl.ConditionalTest do
   use ExUnit.Case, async: true
-  doctest Ootempl.Conditional
+
+  import Ootempl.Xml
 
   alias Ootempl.Conditional
+
+  require Record
+
+  doctest Conditional
 
   describe "detect_conditionals/1" do
     test "detects @if:variable@ markers" do
@@ -414,6 +419,524 @@ defmodule Ootempl.ConditionalTest do
       # Assert
       assert [] = conditionals
       assert :ok = validation
+    end
+  end
+
+  describe "truthy?/1" do
+    test "returns false for nil" do
+      # Arrange & Act
+      result = Conditional.truthy?(nil)
+
+      # Assert
+      assert result == false
+    end
+
+    test "returns false for false" do
+      # Arrange & Act
+      result = Conditional.truthy?(false)
+
+      # Assert
+      assert result == false
+    end
+
+    test "returns false for empty string" do
+      # Arrange & Act
+      result = Conditional.truthy?("")
+
+      # Assert
+      assert result == false
+    end
+
+    test "returns false for integer zero" do
+      # Arrange & Act
+      result = Conditional.truthy?(0)
+
+      # Assert
+      assert result == false
+    end
+
+    test "returns false for float zero" do
+      # Arrange & Act
+      result = Conditional.truthy?(0.0)
+
+      # Assert
+      assert result == false
+    end
+
+    test "returns true for true" do
+      # Arrange & Act
+      result = Conditional.truthy?(true)
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for non-empty string" do
+      # Arrange & Act
+      result = Conditional.truthy?("hello")
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for positive integer" do
+      # Arrange & Act
+      result = Conditional.truthy?(1)
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for negative integer" do
+      # Arrange & Act
+      result = Conditional.truthy?(-1)
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for positive float" do
+      # Arrange & Act
+      result = Conditional.truthy?(3.14)
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for negative float" do
+      # Arrange & Act
+      result = Conditional.truthy?(-2.5)
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for empty list" do
+      # Arrange & Act
+      result = Conditional.truthy?([])
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for non-empty list" do
+      # Arrange & Act
+      result = Conditional.truthy?([1, 2, 3])
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for empty map" do
+      # Arrange & Act
+      result = Conditional.truthy?(%{})
+
+      # Assert
+      assert result == true
+    end
+
+    test "returns true for non-empty map" do
+      # Arrange & Act
+      result = Conditional.truthy?(%{"key" => "value"})
+
+      # Assert
+      assert result == true
+    end
+  end
+
+  describe "evaluate_condition/2" do
+    test "returns true for truthy boolean value" do
+      # Arrange
+      data = %{"active" => true}
+      path = ["active"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "returns false for false boolean value" do
+      # Arrange
+      data = %{"active" => false}
+      path = ["active"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, false} = result
+    end
+
+    test "returns false for zero integer" do
+      # Arrange
+      data = %{"count" => 0}
+      path = ["count"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, false} = result
+    end
+
+    test "returns true for non-zero integer" do
+      # Arrange
+      data = %{"count" => 5}
+      path = ["count"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "returns false for zero float" do
+      # Arrange
+      data = %{"score" => 0.0}
+      path = ["score"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, false} = result
+    end
+
+    test "returns true for non-zero float" do
+      # Arrange
+      data = %{"score" => 3.14}
+      path = ["score"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "returns false for empty string" do
+      # Arrange
+      data = %{"name" => ""}
+      path = ["name"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, false} = result
+    end
+
+    test "returns true for non-empty string" do
+      # Arrange
+      data = %{"name" => "John"}
+      path = ["name"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "evaluates nested data path" do
+      # Arrange
+      data = %{"customer" => %{"active" => true}}
+      path = ["customer", "active"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "evaluates deeply nested data path" do
+      # Arrange
+      data = %{"user" => %{"profile" => %{"verified" => true}}}
+      path = ["user", "profile", "verified"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "uses case-insensitive matching" do
+      # Arrange
+      data = %{"name" => "John"}
+      path = ["Name"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "uses case-insensitive matching for nested paths" do
+      # Arrange
+      data = %{"customer" => %{"active" => true}}
+      path = ["Customer", "Active"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, true} = result
+    end
+
+    test "returns error for missing path" do
+      # Arrange
+      data = %{"name" => "John"}
+      path = ["missing"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:error, {:path_not_found, ["missing"]}} = result
+    end
+
+    test "returns error for missing nested path" do
+      # Arrange
+      data = %{"customer" => %{"name" => "John"}}
+      path = ["customer", "missing"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:error, {:path_not_found, ["customer", "missing"]}} = result
+    end
+
+    test "handles nil value as falsy" do
+      # Arrange
+      data = %{"value" => nil}
+      path = ["value"]
+
+      # Act
+      result = Conditional.evaluate_condition(path, data)
+
+      # Assert
+      assert {:ok, false} = result
+    end
+  end
+
+  describe "find_section_boundaries/3" do
+    import Ootempl.Xml
+
+    test "finds boundaries in single paragraph section" do
+      # Arrange
+      xml_string = """
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p><w:r><w:t>@if:active@Content@endif@</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+
+      # Act
+      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Assert
+      assert {:ok, {start_para, end_para}} = result
+      assert start_para == end_para
+    end
+
+    test "finds boundaries spanning multiple paragraphs" do
+      # Arrange
+      xml_string = """
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Content line 1</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Content line 2</w:t></w:r></w:p>
+          <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+
+      # Act
+      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Assert
+      assert {:ok, {start_para, end_para}} = result
+      assert start_para != end_para
+    end
+
+    test "returns error when if marker not found" do
+      # Arrange
+      xml_string = """
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p><w:r><w:t>Content</w:t></w:r></w:p>
+          <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+
+      # Act
+      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Assert
+      assert {:error, :if_marker_not_found} = result
+    end
+
+    test "returns error when endif marker not found" do
+      # Arrange
+      xml_string = """
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Content</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+
+      # Act
+      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Assert
+      assert {:error, :endif_marker_not_found} = result
+    end
+
+    test "finds boundaries with nested elements" do
+      # Arrange
+      xml_string = """
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+          <w:tbl>
+            <w:tr>
+              <w:tc><w:p><w:r><w:t>Table cell</w:t></w:r></w:p></w:tc>
+            </w:tr>
+          </w:tbl>
+          <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+
+      # Act
+      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Assert
+      assert {:ok, {_start_para, _end_para}} = result
+    end
+  end
+
+  describe "collect_section_nodes/3" do
+    import Ootempl.Xml
+
+    test "collects nodes for single paragraph section" do
+      # Arrange
+      xml_string = """
+      <w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>@if:active@Content@endif@</w:t></w:r></w:p>
+      </w:body>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Act
+      result = Conditional.collect_section_nodes(doc, start_para, end_para)
+
+      # Assert
+      assert {:ok, nodes} = result
+      assert length(nodes) == 1
+    end
+
+    test "collects nodes spanning multiple paragraphs" do
+      # Arrange
+      xml_string = """
+      <w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>Before</w:t></w:r></w:p>
+        <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Content 1</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Content 2</w:t></w:r></w:p>
+        <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+        <w:p><w:r><w:t>After</w:t></w:r></w:p>
+      </w:body>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Act
+      result = Conditional.collect_section_nodes(doc, start_para, end_para)
+
+      # Assert
+      assert {:ok, nodes} = result
+      # Should include: start para, 2 content paras, end para = 4 paragraphs
+      # But XML may include whitespace text nodes, so filter to count paragraphs
+      paragraph_nodes =
+        Enum.filter(nodes, fn node ->
+          Record.is_record(node, :xmlElement) and xmlElement(node, :name) == :"w:p"
+        end)
+
+      assert length(paragraph_nodes) == 4
+    end
+
+    test "collects nodes including tables and other elements" do
+      # Arrange
+      xml_string = """
+      <w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+        <w:tbl>
+          <w:tr><w:tc><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc></w:tr>
+        </w:tbl>
+        <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+      </w:body>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+
+      # Act
+      result = Conditional.collect_section_nodes(doc, start_para, end_para)
+
+      # Assert
+      assert {:ok, nodes} = result
+      # Should include: start para, table, end para = 3 element nodes
+      # But XML may include whitespace text nodes, so filter to count elements
+      element_nodes = Enum.filter(nodes, &Record.is_record(&1, :xmlElement))
+
+      assert length(element_nodes) == 3
+    end
+
+    test "returns error when boundaries not found in element" do
+      # Arrange
+      xml_string = """
+      <w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>Content</w:t></w:r></w:p>
+      </w:body>
+      """
+
+      {:ok, doc} = Ootempl.Xml.parse(xml_string)
+
+      # Create fake paragraph nodes that don't exist in doc
+      fake_start = xmlElement(name: :"w:p", content: [])
+      fake_end = xmlElement(name: :"w:p", content: [])
+
+      # Act
+      result = Conditional.collect_section_nodes(doc, fake_start, fake_end)
+
+      # Assert
+      assert {:error, :boundaries_not_found} = result
     end
   end
 end

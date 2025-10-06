@@ -2,9 +2,10 @@ defmodule Ootempl.ReplacementTest do
   use ExUnit.Case, async: true
 
   import Ootempl.Xml
+
   alias Ootempl.Replacement
 
-  doctest Ootempl.Replacement
+  doctest Replacement
 
   # Helper to wrap XML with namespace declaration
   defp word_xml(content) do
@@ -440,9 +441,7 @@ defmodule Ootempl.ReplacementTest do
     test "handles nested data access" do
       # Arrange
       xml =
-        word_xml(
-          "<w:p><w:r><w:t>Customer: @customer.name@, Email: @customer.email@</w:t></w:r></w:p>"
-        )
+        word_xml("<w:p><w:r><w:t>Customer: @customer.name@, Email: @customer.email@</w:t></w:r></w:p>")
 
       {:ok, doc} = Ootempl.Xml.parse(xml)
       data = %{"customer" => %{"name" => "John Doe", "email" => "john@example.com"}}
@@ -539,7 +538,7 @@ defmodule Ootempl.ReplacementTest do
       {:ok, result} = Replacement.replace_in_document(doc, data)
 
       # Assert
-      body = Ootempl.Xml.find_elements(result, :"w:body") |> List.first()
+      body = result |> Ootempl.Xml.find_elements(:"w:body") |> List.first()
       paragraphs = Ootempl.Xml.find_elements(body, :"w:p")
       assert length(paragraphs) == 2
 
