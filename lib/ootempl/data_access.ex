@@ -1,0 +1,279 @@
+defmodule Ootempl.DataAccess do
+  @moduledoc """
+  Provides data access for nested Elixir data structures with case-insensitive key matching.
+
+  This module enables retrieval of values from nested maps and lists using dot notation paths,
+  with automatic case-insensitive key matching and type conversion to strings.
+
+  ## Examples
+
+      iex> data = %{"name" => "John", "age" => 30}
+      iex> Ootempl.DataAccess.get_value(data, ["name"])
+      {:ok, "John"}
+
+      iex> data = %{"customer" => %{"name" => "Jane"}}
+      iex> Ootempl.DataAccess.get_value(data, ["customer", "name"])
+      {:ok, "Jane"}
+
+      iex> data = %{"count" => 42}
+      iex> Ootempl.DataAccess.get_value(data, ["count"])
+      {:ok, "42"}
+
+      iex> data = %{"items" => [%{"price" => 99.99}]}
+      iex> Ootempl.DataAccess.get_value(data, ["items", "0", "price"])
+      {:ok, "99.99"}
+
+  ## Case-Insensitive Matching
+
+  The module matches keys case-insensitively, so `@Name@`, `@name@`, and `@NAME@`
+  all match the same data key:
+
+      iex> data = %{"name" => "John"}
+      iex> Ootempl.DataAccess.get_value(data, ["Name"])
+      {:ok, "John"}
+
+  If multiple case variants exist, an error is returned:
+
+      iex> data = %{"name" => "John", "Name" => "Jane"}
+      iex> Ootempl.DataAccess.get_value(data, ["name"])
+      {:error, {:ambiguous_key, "name", ["Name", "name"]}}
+  """
+
+  @type path :: [String.t()]
+  @type data :: map() | list()
+  @type error_reason ::
+          {:path_not_found, path()}
+          | {:ambiguous_key, String.t(), [String.t() | atom()]}
+          | {:conflicting_key_types, String.t(), atom(), String.t()}
+          | {:invalid_index, String.t()}
+          | {:index_out_of_bounds, non_neg_integer(), non_neg_integer()}
+          | {:not_a_list, term()}
+          | :nil_value
+          | :unsupported_type
+
+  @doc """
+  Retrieves a value from nested data using a path with case-insensitive key matching.
+
+  Returns `{:ok, value}` where the value is converted to a string, or `{:error, reason}`
+  if the path cannot be resolved.
+
+  ## Parameters
+
+    - `data` - The data structure to traverse (map or list)
+    - `path` - List of path segments to navigate (e.g., `["customer", "name"]`)
+
+  ## Returns
+
+    - `{:ok, string}` - The value converted to a string
+    - `{:error, reason}` - Error with details about what went wrong
+
+  ## Examples
+
+      iex> Ootempl.DataAccess.get_value(%{"name" => "John"}, ["name"])
+      {:ok, "John"}
+
+      iex> Ootempl.DataAccess.get_value(%{"count" => 5}, ["count"])
+      {:ok, "5"}
+
+      iex> Ootempl.DataAccess.get_value(%{"active" => true}, ["active"])
+      {:ok, "true"}
+
+      iex> Ootempl.DataAccess.get_value(%{}, ["missing"])
+      {:error, {:path_not_found, ["missing"]}}
+  """
+  @spec get_value(data(), path()) :: {:ok, String.t()} | {:error, error_reason()}
+  def get_value(data, path) when is_list(path) do
+    case traverse(data, path, path) do
+      {:ok, value} -> to_string_value(value)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc """
+  Converts a value to its string representation.
+
+  Handles strings, numbers, booleans, and returns errors for nil and unsupported types.
+
+  ## Parameters
+
+    - `value` - The value to convert
+
+  ## Returns
+
+    - `{:ok, string}` - The value as a string
+    - `{:error, :nil_value}` - When value is nil
+    - `{:error, :unsupported_type}` - When value type cannot be converted
+
+  ## Examples
+
+      iex> Ootempl.DataAccess.to_string_value("hello")
+      {:ok, "hello"}
+
+      iex> Ootempl.DataAccess.to_string_value(42)
+      {:ok, "42"}
+
+      iex> Ootempl.DataAccess.to_string_value(true)
+      {:ok, "true"}
+
+      iex> Ootempl.DataAccess.to_string_value(false)
+      {:ok, "false"}
+
+      iex> Ootempl.DataAccess.to_string_value(nil)
+      {:error, :nil_value}
+
+      iex> Ootempl.DataAccess.to_string_value(%{})
+      {:error, :unsupported_type}
+  """
+  @spec to_string_value(term()) :: {:ok, String.t()} | {:error, :nil_value | :unsupported_type}
+  def to_string_value(value) when is_binary(value), do: {:ok, value}
+  def to_string_value(value) when is_number(value), do: {:ok, to_string(value)}
+  def to_string_value(true), do: {:ok, "true"}
+  def to_string_value(false), do: {:ok, "false"}
+  def to_string_value(nil), do: {:error, :nil_value}
+  def to_string_value(_), do: {:error, :unsupported_type}
+
+  # Private functions
+
+  @spec traverse(data(), path(), path()) :: {:ok, term()} | {:error, error_reason()}
+  defp traverse(data, [], _original_path), do: {:ok, data}
+
+  defp traverse(data, [segment | rest], original_path) when is_map(data) do
+    case normalize_key(segment, Map.keys(data)) do
+      {:ok, key} ->
+        traverse(Map.get(data, key), rest, original_path)
+
+      {:error, {:path_not_found, _}} ->
+        {:error, {:path_not_found, original_path}}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp traverse(data, [segment | rest], original_path) when is_list(data) do
+    case parse_index(segment) do
+      {:ok, index} ->
+        if index < length(data) do
+          traverse(Enum.at(data, index), rest, original_path)
+        else
+          {:error, {:index_out_of_bounds, index, length(data)}}
+        end
+
+      {:error, :invalid_index} ->
+        {:error, {:invalid_index, segment}}
+    end
+  end
+
+  defp traverse(_data, _path, original_path) do
+    {:error, {:path_not_found, original_path}}
+  end
+
+  @doc """
+  Finds the matching key in a case-insensitive manner.
+
+  Supports both string and atom keys. Atom keys are converted to strings for matching.
+  If both an atom and string version of the same key exist (e.g., `:name` and `"name"`),
+  an error is returned.
+
+  ## Parameters
+
+    - `lookup_key` - The key to search for (case-insensitive)
+    - `available_keys` - List of available keys to search through (strings or atoms)
+
+  ## Returns
+
+    - `{:ok, key}` - The matched key (in its original form: string or atom)
+    - `{:error, {:path_not_found, [lookup_key]}}` - No matching key found
+    - `{:error, {:ambiguous_key, lookup_key, matches}}` - Multiple case variants found (sorted)
+    - `{:error, {:conflicting_key_types, lookup_key, atom_key, string_key}}` - Both atom and string versions exist
+
+  ## Examples
+
+      iex> Ootempl.DataAccess.normalize_key("name", ["name", "age"])
+      {:ok, "name"}
+
+      iex> Ootempl.DataAccess.normalize_key("Name", ["name", "age"])
+      {:ok, "name"}
+
+      iex> Ootempl.DataAccess.normalize_key("name", [:name, :age])
+      {:ok, :name}
+
+      iex> Ootempl.DataAccess.normalize_key("NAME", [:name, :age])
+      {:ok, :name}
+
+      iex> Ootempl.DataAccess.normalize_key("missing", ["name", "age"])
+      {:error, {:path_not_found, ["missing"]}}
+
+      iex> Ootempl.DataAccess.normalize_key("name", ["name", "Name"])
+      {:error, {:ambiguous_key, "name", ["Name", "name"]}}
+
+      iex> Ootempl.DataAccess.normalize_key("name", [:name, "name"])
+      {:error, {:conflicting_key_types, "name", :name, "name"}}
+  """
+  @spec normalize_key(String.t(), [String.t() | atom()]) ::
+          {:ok, String.t() | atom()}
+          | {:error,
+             {:path_not_found, [String.t()]}
+             | {:ambiguous_key, String.t(), [String.t() | atom()]}
+             | {:conflicting_key_types, String.t(), atom(), String.t()}}
+  def normalize_key(lookup_key, available_keys) when is_binary(lookup_key) and is_list(available_keys) do
+    lowercase_lookup = String.downcase(lookup_key)
+    {atom_matches, string_matches} = find_matches(available_keys, lowercase_lookup)
+    resolve_key_match(lookup_key, atom_matches, string_matches)
+  end
+
+  @spec find_matches([String.t() | atom()], String.t()) :: {[atom()], [String.t()]}
+  defp find_matches(available_keys, lowercase_lookup) do
+    {atom_keys, string_keys} = Enum.split_with(available_keys, &is_atom/1)
+
+    atom_matches =
+      atom_keys
+      |> Enum.filter(fn key -> key |> Atom.to_string() |> String.downcase() == lowercase_lookup end)
+
+    string_matches =
+      string_keys
+      |> Enum.filter(fn key -> String.downcase(key) == lowercase_lookup end)
+
+    {atom_matches, string_matches}
+  end
+
+  @spec resolve_key_match(String.t(), [atom()], [String.t()]) ::
+          {:ok, String.t() | atom()}
+          | {:error,
+             {:path_not_found, [String.t()]}
+             | {:ambiguous_key, String.t(), [String.t() | atom()]}
+             | {:conflicting_key_types, String.t(), atom(), String.t()}}
+  defp resolve_key_match(lookup_key, atom_matches, string_matches) do
+    case {atom_matches, string_matches} do
+      {[], []} ->
+        {:error, {:path_not_found, [lookup_key]}}
+
+      {[atom_key], [string_key]} ->
+        {:error, {:conflicting_key_types, lookup_key, atom_key, string_key}}
+
+      {[single_atom], []} ->
+        {:ok, single_atom}
+
+      {[], [single_string]} ->
+        {:ok, single_string}
+
+      {atom_matches, []} when length(atom_matches) > 1 ->
+        {:error, {:ambiguous_key, lookup_key, Enum.sort(atom_matches)}}
+
+      {[], string_matches} when length(string_matches) > 1 ->
+        {:error, {:ambiguous_key, lookup_key, Enum.sort(string_matches)}}
+
+      {atom_matches, string_matches} ->
+        all_matches = Enum.sort(atom_matches ++ string_matches)
+        {:error, {:ambiguous_key, lookup_key, all_matches}}
+    end
+  end
+
+  @spec parse_index(String.t()) :: {:ok, non_neg_integer()} | {:error, :invalid_index}
+  defp parse_index(segment) do
+    case Integer.parse(segment) do
+      {index, ""} when index >= 0 -> {:ok, index}
+      _ -> {:error, :invalid_index}
+    end
+  end
+end

@@ -22,4 +22,11 @@ ootempl-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+# Test output files that are regenerated
+test/fixtures/manual_verification.docx
+test/fixtures/manual_inspection_output.docx
+
+# macOS files
+.DS_Store
+
 .decree.db

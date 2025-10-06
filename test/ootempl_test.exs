@@ -5,6 +5,8 @@ defmodule OotemplTest do
 
   @test_fixture "test/fixtures/Simple Placeholdes from Word.docx"
   @output_path "test/fixtures/output_test.docx"
+  # Template has @person.first_name@ and @date@ placeholders
+  @valid_data %{"person" => %{"first_name" => "Test User"}, "date" => "2025-10-06"}
 
   setup do
     # Clean up any leftover output files from previous test runs
@@ -21,7 +23,7 @@ defmodule OotemplTest do
     test "successfully renders a valid .docx template" do
       # Arrange
       template_path = @test_fixture
-      data = %{}
+      data = @valid_data
       output_path = @output_path
 
       # Act
@@ -38,7 +40,7 @@ defmodule OotemplTest do
       output_path = @output_path
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - validate output is valid .docx
       assert Ootempl.Validator.validate_docx(output_path) == :ok
@@ -50,7 +52,7 @@ defmodule OotemplTest do
       output_path = @output_path
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - check for required files
       {:ok, zip_handle} = :zip.zip_open(to_charlist(output_path), [:memory])
@@ -70,36 +72,16 @@ defmodule OotemplTest do
       output_path = @output_path
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - validate XML can be parsed
       {:ok, xml_content} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
       assert {:ok, _doc} = Ootempl.Xml.parse(xml_content)
     end
 
-    test "cleans up temporary files after successful render" do
-      # Arrange
-      template_path = @test_fixture
-      output_path = @output_path
-      temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
-
-      # Get temp directories before
-      temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
-        |> Enum.filter(&File.dir?/1)
-        |> length()
-
-      # Act
-      Ootempl.render(template_path, %{}, output_path)
-
-      # Assert - no new temp directories left behind
-      temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
-        |> Enum.filter(&File.dir?/1)
-        |> length()
-
-      assert temp_dirs_after == temp_dirs_before
-    end
+    # Note: Cleanup is verified by error path tests and integration tests
+    # A dedicated cleanup test was removed due to race conditions with parallel test execution
+    # (async tests in archive_test.exs create temp directories concurrently)
 
     test "returns error when template file does not exist" do
       # Arrange
@@ -107,7 +89,7 @@ defmodule OotemplTest do
       output_path = @output_path
 
       # Act
-      result = Ootempl.render(template_path, %{}, output_path)
+      result = Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert
       assert {:error, %Ootempl.ValidationError{reason: :file_not_found}} = result
@@ -120,7 +102,7 @@ defmodule OotemplTest do
       output_path = template_path
 
       # Act
-      result = Ootempl.render(template_path, %{}, output_path)
+      result = Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert
       assert {:error, {:same_file, _message}} = result
@@ -132,7 +114,7 @@ defmodule OotemplTest do
       output_path = "/nonexistent_directory/output.docx"
 
       # Act
-      result = Ootempl.render(template_path, %{}, output_path)
+      result = Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert
       assert {:error, {:invalid_output_path, _message}} = result
@@ -148,7 +130,7 @@ defmodule OotemplTest do
       old_size = File.stat!(output_path).size
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - file was overwritten (different size)
       new_size = File.stat!(output_path).size
@@ -181,7 +163,7 @@ defmodule OotemplTest do
         end
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - output has same files
       {:ok, zip_handle} = :zip.zip_open(to_charlist(output_path), [:memory])
@@ -206,17 +188,22 @@ defmodule OotemplTest do
       assert output_files == template_files
     end
 
-    test "accepts data parameter but does not use it (future feature)" do
+    test "uses data parameter to replace placeholders" do
       # Arrange
       template_path = @test_fixture
-      data = %{name: "John Doe", total: 1500}
+      data = @valid_data
       output_path = @output_path
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
 
-      # Assert - should succeed but data is not used yet
+      # Assert - should succeed with placeholder replacement
       assert result == :ok
+
+      # Verify placeholders were actually replaced
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Test User"
+      assert output_xml =~ "2025-10-06"
     end
 
     test "cleans up temp directory even when XML parsing fails" do
@@ -240,12 +227,13 @@ defmodule OotemplTest do
 
       # Get temp directories before
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
       # Act - this should fail during XML parsing
-      result = Ootempl.render(malformed_path, %{}, output_path)
+      result = Ootempl.render(malformed_path, @valid_data, output_path)
 
       # Assert - should fail but cleanup temp directory
       assert {:error, _} = result
@@ -253,7 +241,8 @@ defmodule OotemplTest do
 
       # Verify no temp directories leaked
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -267,7 +256,8 @@ defmodule OotemplTest do
 
       # Get temp directories before
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -275,14 +265,15 @@ defmodule OotemplTest do
       invalid_output = "/root/cannot_write_here.docx"
 
       # Act
-      result = Ootempl.render(template_path, %{}, invalid_output)
+      result = Ootempl.render(template_path, @valid_data, invalid_output)
 
       # Assert - should fail but cleanup happened
       assert {:error, _} = result
 
       # Verify no temp directories leaked
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -299,7 +290,7 @@ defmodule OotemplTest do
       output_path = @output_path
 
       # Act - normal render
-      result = Ootempl.render(template_path, %{}, output_path)
+      result = Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - in normal case this succeeds
       # The cleanup error path is hard to test without mocking,
@@ -316,7 +307,7 @@ defmodule OotemplTest do
       on_exit(fn -> File.rm(invalid_zip) end)
 
       # Act
-      result = Ootempl.render(invalid_zip, %{}, output_path)
+      result = Ootempl.render(invalid_zip, @valid_data, output_path)
 
       # Assert - should fail at validation or extraction
       assert {:error, _} = result
@@ -339,7 +330,7 @@ defmodule OotemplTest do
       on_exit(fn -> File.rm(incomplete_path) end)
 
       # Act - will fail during validation (missing file check)
-      result = Ootempl.render(incomplete_path, %{}, output_path)
+      result = Ootempl.render(incomplete_path, @valid_data, output_path)
 
       # Assert
       assert {:error, %Ootempl.MissingFileError{}} = result
@@ -351,7 +342,7 @@ defmodule OotemplTest do
       output_with_nonexistent_dir = "/this/directory/does/not/exist/output.docx"
 
       # Act
-      result = Ootempl.render(template_path, %{}, output_with_nonexistent_dir)
+      result = Ootempl.render(template_path, @valid_data, output_with_nonexistent_dir)
 
       # Assert - should fail early in validate_paths
       assert {:error, {:invalid_output_path, message}} = result
@@ -365,7 +356,7 @@ defmodule OotemplTest do
       same_path = template_path
 
       # Act
-      result = Ootempl.render(template_path, %{}, same_path)
+      result = Ootempl.render(template_path, @valid_data, same_path)
 
       # Assert - should fail early in validate_paths
       assert {:error, {:same_file, message}} = result
@@ -377,7 +368,8 @@ defmodule OotemplTest do
       temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
 
       temp_dirs_before =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -386,7 +378,7 @@ defmodule OotemplTest do
       output_path = @output_path
 
       # Act - this should succeed
-      result = Ootempl.render(template_path, %{}, output_path)
+      result = Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - succeeds and cleanup happened
       assert result == :ok
@@ -394,7 +386,8 @@ defmodule OotemplTest do
 
       # Verify cleanup happened
       temp_dirs_after =
-        Path.wildcard(temp_dir_pattern)
+        temp_dir_pattern
+        |> Path.wildcard()
         |> Enum.filter(&File.dir?/1)
         |> length()
 
@@ -409,11 +402,12 @@ defmodule OotemplTest do
 
       test_cases = [
         # Malformed XML - fails at parsing
-        {"test/fixtures/malformed_for_cleanup.docx", %{
-          "word/document.xml" => "<bad><xml>",
-          "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
-          "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
-        }}
+        {"test/fixtures/malformed_for_cleanup.docx",
+         %{
+           "word/document.xml" => "<bad><xml>",
+           "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+           "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+         }}
       ]
 
       temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
@@ -426,18 +420,20 @@ defmodule OotemplTest do
         on_exit(fn -> File.rm(test_file) end)
 
         temp_dirs_before =
-          Path.wildcard(temp_dir_pattern)
+          temp_dir_pattern
+          |> Path.wildcard()
           |> Enum.filter(&File.dir?/1)
           |> length()
 
         # Act
-        result = Ootempl.render(test_file, %{}, "test/fixtures/out.docx")
+        result = Ootempl.render(test_file, @valid_data, "test/fixtures/out.docx")
 
         # Assert
         assert {:error, _} = result
 
         temp_dirs_after =
-          Path.wildcard(temp_dir_pattern)
+          temp_dir_pattern
+          |> Path.wildcard()
           |> Enum.filter(&File.dir?/1)
           |> length()
 
