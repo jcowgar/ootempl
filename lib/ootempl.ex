@@ -9,18 +9,24 @@ defmodule Ootempl do
   ## Features
 
   - Load and parse .docx templates
-  - Transform content using placeholder replacement (future)
+  - Replace `@variable@` placeholders with dynamic content
+  - Support nested data access with dot notation (`@customer.name@`)
+  - Case-insensitive placeholder matching
+  - Preserve Word formatting (bold, italic, fonts)
   - Generate valid .docx output files
   - Comprehensive validation and error handling
 
   ## Basic Usage
 
   ```elixir
-  # Render a template with data (placeholder replacement in future epics)
-  Ootempl.render("template.docx", %{name: "John Doe"}, "output.docx")
-
-  # Current implementation validates round-trip (load and save)
-  Ootempl.render("template.docx", %{}, "output.docx")
+  # Render a template with placeholder replacement
+  data = %{
+    "name" => "John Doe",
+    "customer" => %{"email" => "john@example.com"},
+    "total" => 99.99
+  }
+  Ootempl.render("template.docx", data, "output.docx")
+  #=> :ok
   ```
 
   ## Architecture
@@ -29,13 +35,18 @@ defmodule Ootempl do
 
   - `Ootempl.Archive` - ZIP archive operations for .docx files
   - `Ootempl.Xml` - XML parsing and serialization using :xmerl
+  - `Ootempl.Xml.Normalizer` - XML normalization for fragmented placeholders
+  - `Ootempl.Placeholder` - Placeholder detection and parsing
+  - `Ootempl.DataAccess` - Nested data access with case-insensitive matching
+  - `Ootempl.Replacement` - Placeholder replacement in XML with formatting preservation
   - `Ootempl.Validator` - Document validation and error handling
 
   ## Error Handling
 
-  All functions return standard Elixir result tuples:
-  - `{:ok, result}` on success
-  - `{:error, exception}` on failure
+  The main `render/3` function returns:
+  - `:ok` on success (document generated successfully)
+  - `{:error, errors}` when placeholders cannot be resolved
+  - `{:error, exception}` on structural failures
 
   Specific error types:
   - `Ootempl.ValidationError` - File validation failures
