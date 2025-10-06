@@ -14,6 +14,8 @@ defmodule Ootempl do
   - Dynamic table row generation from list data
   - Multi-row table templates for complex layouts
   - Case-insensitive placeholder matching
+  - Process headers, footers, footnotes, and endnotes
+  - Replace placeholders in document properties (title, author, company)
   - Preserve Word formatting (bold, italic, fonts, table borders, shading)
   - Generate valid .docx output files
   - Comprehensive validation and error handling
@@ -89,6 +91,50 @@ defmodule Ootempl do
   | 5x Widget @ $10.00 each |
   | Order 101           |
   | 3x Gadget @ $25.00 each |
+  ```
+
+  ### Document Properties
+
+  Placeholders in document metadata (title, author, company) are automatically replaced.
+  Use this feature to populate document properties from your data.
+
+  ```elixir
+  # Template has placeholders in File > Properties:
+  # - Title: @document_title@
+  # - Author: @author@
+  # - Company: @company_name@
+
+  data = %{
+    "document_title" => "Q4 Financial Report",
+    "author" => "Jane Smith",
+    "company_name" => "Acme Corporation"
+  }
+  Ootempl.render("report_template.docx", data, "Q4_report.docx")
+  #=> :ok
+  # Generated document has Title, Author, and Company fields populated
+  ```
+
+  Supported property fields:
+  - **Core properties**: `dc:title`, `dc:subject`, `dc:description`, `dc:creator`
+  - **App properties**: `Company`, `Manager`
+
+  ### Headers, Footers, Footnotes, and Endnotes
+
+  Placeholders in headers, footers, footnotes, and endnotes are processed just like
+  the main document body:
+
+  ```elixir
+  # Template has:
+  # - Header with: @company_name@ - @document_title@
+  # - Footer with: Page @page@ of @total_pages@
+  # - Footnote with: @footnote_citation@
+
+  data = %{
+    "company_name" => "Acme Corp",
+    "document_title" => "Annual Report",
+    "footnote_citation" => "Source: Annual Review 2025"
+  }
+  Ootempl.render("template.docx", data, "output.docx")
   ```
 
   ## Architecture
@@ -225,6 +271,8 @@ defmodule Ootempl do
   defp process_template(temp_dir, data, output_path) do
     with :ok <- process_single_xml_file(temp_dir, "word/document.xml", data),
          :ok <- process_header_footer_files(temp_dir, data),
+         :ok <- process_footnote_endnote_files(temp_dir, data),
+         :ok <- process_document_properties(temp_dir, data),
          {:ok, file_map} <- build_file_map(temp_dir) do
       Archive.create(file_map, output_path)
     end
@@ -286,6 +334,67 @@ defmodule Ootempl do
         {:error, _reason} = error -> {:halt, error}
       end
     end)
+  end
+
+  # Processes footnotes and endnotes XML files if they exist.
+  #
+  # Finds `word/footnotes.xml` and `word/endnotes.xml` files and applies
+  # the same processing pipeline used for the main document body.
+  # These files use the same w:p/w:r/w:t XML structure as document.xml.
+  #
+  # Missing files are OK (not all documents have footnotes or endnotes).
+  @spec process_footnote_endnote_files(Path.t(), map()) :: :ok | {:error, term()}
+  defp process_footnote_endnote_files(temp_dir, data) do
+    ["word/footnotes.xml", "word/endnotes.xml"]
+    |> Enum.filter(&File.exists?(Path.join(temp_dir, &1)))
+    |> Enum.reduce_while(:ok, fn relative_path, _acc ->
+      case process_single_xml_file(temp_dir, relative_path, data) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # Processes document property files for placeholder replacement.
+  #
+  # Handles `docProps/core.xml` (title, subject, description, creator) and
+  # `docProps/app.xml` (company, manager) files. These files use simpler XML
+  # structures with direct text content rather than Word's paragraph/run structure.
+  #
+  # Missing property files are OK (not all documents have all properties set).
+  @spec process_document_properties(Path.t(), map()) :: :ok | {:error, term()}
+  defp process_document_properties(temp_dir, data) do
+    ["docProps/core.xml", "docProps/app.xml"]
+    |> Enum.filter(&File.exists?(Path.join(temp_dir, &1)))
+    |> Enum.reduce_while(:ok, fn relative_path, _acc ->
+      case process_property_file(temp_dir, relative_path, data) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # Processes a document property XML file using simple text replacement.
+  #
+  # Property files have simpler XML structures with direct text content
+  # (e.g., `<dc:title>@title@</dc:title>`) rather than the complex
+  # w:p/w:r/w:t structure used in the main document. This function uses
+  # the full XML processing pipeline to ensure proper handling.
+  @spec process_property_file(Path.t(), String.t(), map()) :: :ok | {:error, term()}
+  defp process_property_file(temp_dir, relative_path, data) do
+    file_path = Path.join(temp_dir, relative_path)
+
+    with {:ok, xml_content} <- File.read(file_path),
+         {:ok, xml_doc} <- Xml.parse(xml_content),
+         normalized_doc <- Normalizer.normalize(xml_doc),
+         {:ok, replaced_doc} <- Replacement.replace_in_document(normalized_doc, data),
+         {:ok, modified_xml} <- Xml.serialize(replaced_doc),
+         :ok <- File.write(file_path, modified_xml) do
+      :ok
+    else
+      {:error, %Ootempl.PlaceholderError{} = error} -> {:error, error}
+      {:error, reason} -> {:error, {:property_file_processing_failed, relative_path, reason}}
+    end
   end
 
   @spec process_tables(Xml.xml_element(), map()) :: {:ok, Xml.xml_element()} | {:error, term()}
