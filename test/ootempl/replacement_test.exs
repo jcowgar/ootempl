@@ -191,7 +191,7 @@ defmodule Ootempl.ReplacementTest do
 
       # Assert
       assert original == text_node
-      assert [{:placeholder_not_found, "@missing@", {:path_not_found, ["missing"]}}] = errors
+      assert [{"@missing@", {:path_not_found, ["missing"]}}] = errors
     end
 
     test "collects multiple errors" do
@@ -208,8 +208,8 @@ defmodule Ootempl.ReplacementTest do
       assert original == text_node
       assert length(errors) == 2
 
-      assert {:placeholder_not_found, "@missing1@", {:path_not_found, ["missing1"]}} in errors
-      assert {:placeholder_not_found, "@missing2@", {:path_not_found, ["missing2"]}} in errors
+      assert {"@missing1@", {:path_not_found, ["missing1"]}} in errors
+      assert {"@missing2@", {:path_not_found, ["missing2"]}} in errors
     end
 
     test "handles empty replacement value" do
@@ -405,10 +405,12 @@ defmodule Ootempl.ReplacementTest do
       data = %{}
 
       # Act
-      {:error, errors} = Replacement.replace_in_document(doc, data)
+      {:error, error} = Replacement.replace_in_document(doc, data)
 
       # Assert
-      assert [{:placeholder_not_found, "@missing@", {:path_not_found, ["missing"]}}] = errors
+      assert %Ootempl.PlaceholderError{} = error
+      assert length(error.placeholders) == 1
+      assert %{placeholder: "@missing@", reason: {:path_not_found, ["missing"]}} in error.placeholders
     end
 
     test "collects all errors from multiple placeholders" do
@@ -425,13 +427,14 @@ defmodule Ootempl.ReplacementTest do
       data = %{}
 
       # Act
-      {:error, errors} = Replacement.replace_in_document(doc, data)
+      {:error, error} = Replacement.replace_in_document(doc, data)
 
       # Assert
-      assert length(errors) == 2
+      assert %Ootempl.PlaceholderError{} = error
+      assert length(error.placeholders) == 2
 
-      assert {:placeholder_not_found, "@missing1@", {:path_not_found, ["missing1"]}} in errors
-      assert {:placeholder_not_found, "@missing2@", {:path_not_found, ["missing2"]}} in errors
+      assert %{placeholder: "@missing1@", reason: {:path_not_found, ["missing1"]}} in error.placeholders
+      assert %{placeholder: "@missing2@", reason: {:path_not_found, ["missing2"]}} in error.placeholders
     end
 
     test "handles nested data access" do
@@ -603,7 +606,7 @@ defmodule Ootempl.ReplacementTest do
       {:ok, _original, errors} = Replacement.replace_in_text_node(text_node, data)
 
       # Assert
-      assert [{:placeholder_not_found, "@nullable@", :nil_value}] = errors
+      assert [{"@nullable@", :nil_value}] = errors
     end
 
     test "handles error with index out of bounds" do
@@ -617,8 +620,7 @@ defmodule Ootempl.ReplacementTest do
       {:ok, _original, errors} = Replacement.replace_in_text_node(text_node, data)
 
       # Assert
-      assert [{:placeholder_not_found, "@items.5.name@", {:index_out_of_bounds, 5, 1}}] =
-               errors
+      assert [{"@items.5.name@", {:index_out_of_bounds, 5, 1}}] = errors
     end
   end
 end

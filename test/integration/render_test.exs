@@ -116,12 +116,12 @@ defmodule Ootempl.Integration.RenderTest do
       result = Ootempl.render(template_path, data, @output_path)
 
       # Assert
-      assert {:error, errors} = result
-      assert is_list(errors)
-      assert length(errors) > 0
+      assert {:error, error} = result
+      assert %Ootempl.PlaceholderError{} = error
+      assert length(error.placeholders) > 0
 
       # Check error structure
-      [{:placeholder_not_found, placeholder, reason} | _] = errors
+      [%{placeholder: placeholder, reason: reason} | _] = error.placeholders
       assert is_binary(placeholder)
       assert String.starts_with?(placeholder, "@")
       assert String.ends_with?(placeholder, "@")
@@ -137,10 +137,10 @@ defmodule Ootempl.Integration.RenderTest do
       result = Ootempl.render(template_path, data, @output_path)
 
       # Assert
-      assert {:error, errors} = result
-      assert is_list(errors)
+      assert {:error, error} = result
+      assert %Ootempl.PlaceholderError{} = error
       # Template should have @person.first_name@ missing
-      assert length(errors) >= 1
+      assert length(error.placeholders) >= 1
     end
 
     test "escapes XML special characters in replacement values" do

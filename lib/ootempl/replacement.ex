@@ -43,6 +43,7 @@ defmodule Ootempl.Replacement do
 
   alias Ootempl.DataAccess
   alias Ootempl.Placeholder
+  alias Ootempl.PlaceholderError
 
   require Record
 
@@ -50,9 +51,10 @@ defmodule Ootempl.Replacement do
   @type xml_text :: Ootempl.Xml.xml_text()
   @type xml_node :: Ootempl.Xml.xml_node()
 
-  @type replacement_error ::
-          {:placeholder_not_found, String.t(), DataAccess.error_reason()}
-          | {:replacement_failed, String.t(), term()}
+  @type placeholder_error_detail :: %{
+          placeholder: String.t(),
+          reason: DataAccess.error_reason()
+        }
 
   @doc """
   Replaces all placeholders in the document XML with values from the data map.
@@ -72,7 +74,7 @@ defmodule Ootempl.Replacement do
   ## Returns
 
     - `{:ok, modified_xml}` - Modified XML with all replacements applied
-    - `{:error, errors}` - List of all errors encountered (missing keys, invalid paths)
+    - `{:error, %PlaceholderError{}}` - Struct containing all placeholder resolution errors
 
   ## Examples
 
@@ -87,14 +89,27 @@ defmodule Ootempl.Replacement do
 
           {:ok, doc} = Ootempl.Xml.parse("<w:p><w:r><w:t>@missing@</w:t></w:r></w:p>")
           Ootempl.Replacement.replace_in_document(doc, %{})
-          # => {:error, [{:placeholder_not_found, "@missing@", {:path_not_found, ["missing"]}}]}
+          # => {:error, %Ootempl.PlaceholderError{
+          #      message: "Placeholder @missing@ could not be resolved",
+          #      placeholders: [%{placeholder: "@missing@", reason: {:path_not_found, ["missing"]}}]
+          #    }}
   """
   @spec replace_in_document(xml_element(), map()) ::
-          {:ok, xml_element()} | {:error, [replacement_error()]}
+          {:ok, xml_element()} | {:error, PlaceholderError.t()}
   def replace_in_document(xml_element, data) when is_map(data) do
     case traverse_and_replace(xml_element, data) do
-      {:ok, modified, []} -> {:ok, modified}
-      {:ok, _modified, errors} -> {:error, errors}
+      {:ok, modified, []} ->
+        {:ok, modified}
+
+      {:ok, _modified, errors} ->
+        # Convert error tuples to maps
+        placeholder_errors =
+          Enum.map(errors, fn {placeholder, reason} ->
+            %{placeholder: placeholder, reason: reason}
+          end)
+
+        error = PlaceholderError.exception(placeholders: placeholder_errors)
+        {:error, error}
     end
   end
 
@@ -112,7 +127,7 @@ defmodule Ootempl.Replacement do
   ## Returns
 
     - `{:ok, modified_text_node, []}` - Modified text node with no errors
-    - `{:ok, original_text_node, errors}` - Original text node with list of errors
+    - `{:ok, original_text_node, errors}` - Original text node with list of error tuples
 
   ## Examples
 
@@ -125,7 +140,7 @@ defmodule Ootempl.Replacement do
           # result contains modified text node with "Hello World"
   """
   @spec replace_in_text_node(xml_text(), map()) ::
-          {:ok, xml_text(), [replacement_error()]}
+          {:ok, xml_text(), [{String.t(), DataAccess.error_reason()}]}
   def replace_in_text_node(text_node, data) do
     text = text_node |> xmlText(:value) |> List.to_string()
     placeholders = Placeholder.detect(text)
@@ -140,7 +155,8 @@ defmodule Ootempl.Replacement do
             {new_text, acc_errors}
 
           {:error, reason} ->
-            error = {:placeholder_not_found, placeholder.original, reason}
+            # Store as {placeholder, reason} tuple
+            error = {placeholder.original, reason}
             {current_text, [error | acc_errors]}
         end
       end)
@@ -195,7 +211,7 @@ defmodule Ootempl.Replacement do
   # Private functions
 
   @spec traverse_and_replace(xml_element(), map()) ::
-          {:ok, xml_element(), [replacement_error()]}
+          {:ok, xml_element(), [{String.t(), DataAccess.error_reason()}]}
   defp traverse_and_replace(element, data) do
     content = xmlElement(element, :content)
 
@@ -214,7 +230,7 @@ defmodule Ootempl.Replacement do
   end
 
   @spec process_node(xml_node(), map()) ::
-          {:ok, xml_node(), [replacement_error()]}
+          {:ok, xml_node(), [{String.t(), DataAccess.error_reason()}]}
   defp process_node(node, data) do
     cond do
       Record.is_record(node, :xmlText) ->

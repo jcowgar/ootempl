@@ -147,3 +147,64 @@ defmodule Ootempl.ValidationError do
     "Validation failed for #{path}: #{inspect(reason)}"
   end
 end
+
+defmodule Ootempl.PlaceholderError do
+  @moduledoc """
+  Raised when one or more placeholders in a template cannot be resolved.
+
+  This error collects all placeholder resolution failures that occur during
+  template rendering, allowing you to see all missing data at once rather
+  than failing on the first missing placeholder.
+
+  Each placeholder error contains:
+  - `placeholder` - The original placeholder text (e.g., "@name@")
+  - `reason` - Why it couldn't be resolved (e.g., `{:path_not_found, ["name"]}`)
+
+  ## Common Reasons
+
+  - `{:path_not_found, path}` - Data key doesn't exist in the provided data map
+  - `{:ambiguous_key, key, matches}` - Multiple case variants of the key exist
+  - `{:invalid_index, index}` - List index is not a valid number
+  - `{:index_out_of_bounds, index, size}` - List index exceeds list size
+  - `{:not_a_list, value}` - Tried to index into a non-list value
+  - `:nil_value` - Data path exists but value is nil
+  - `{:unsupported_type, type}` - Value type cannot be converted to string
+  """
+  defexception [:message, :placeholders]
+
+  @type placeholder_error :: %{
+          placeholder: String.t(),
+          reason: term()
+        }
+
+  @type t :: %__MODULE__{
+          message: String.t(),
+          placeholders: [placeholder_error()]
+        }
+
+  @impl true
+  def exception(opts) do
+    placeholders = Keyword.fetch!(opts, :placeholders)
+
+    message = build_message(placeholders)
+
+    %__MODULE__{
+      message: message,
+      placeholders: placeholders
+    }
+  end
+
+  defp build_message([]) do
+    "No placeholders could be resolved"
+  end
+
+  defp build_message([%{placeholder: placeholder}]) do
+    "Placeholder #{placeholder} could not be resolved"
+  end
+
+  defp build_message(placeholders) do
+    count = length(placeholders)
+    first = List.first(placeholders)
+    "#{count} placeholders could not be resolved (first: #{first.placeholder})"
+  end
+end

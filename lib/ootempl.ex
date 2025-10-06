@@ -45,10 +45,11 @@ defmodule Ootempl do
 
   The main `render/3` function returns:
   - `:ok` on success (document generated successfully)
-  - `{:error, errors}` when placeholders cannot be resolved
+  - `{:error, %PlaceholderError{}}` when placeholders cannot be resolved
   - `{:error, exception}` on structural failures
 
   Specific error types:
+  - `Ootempl.PlaceholderError` - One or more placeholders cannot be resolved
   - `Ootempl.ValidationError` - File validation failures
   - `Ootempl.InvalidArchiveError` - Invalid ZIP structure
   - `Ootempl.MissingFileError` - Required files missing
@@ -81,7 +82,7 @@ defmodule Ootempl do
   ## Returns
 
   - `:ok` on success
-  - `{:error, errors}` when placeholders cannot be resolved (list of error details)
+  - `{:error, %PlaceholderError{}}` when placeholders cannot be resolved
   - `{:error, exception}` on structural failures (invalid file, corrupt ZIP, etc.)
 
   ## Examples
@@ -97,10 +98,13 @@ defmodule Ootempl do
 
       # Missing placeholders (collects all errors)
       Ootempl.render("template.docx", %{}, "output.docx")
-      #=> {:error, [
-      #     {:placeholder_not_found, "@name@", {:path_not_found, ["name"]}},
-      #     {:placeholder_not_found, "@customer.email@", {:path_not_found, ["customer", "email"]}}
-      #   ]}
+      #=> {:error, %Ootempl.PlaceholderError{
+      #     message: "2 placeholders could not be resolved (first: @name@)",
+      #     placeholders: [
+      #       %{placeholder: "@name@", reason: {:path_not_found, ["name"]}},
+      #       %{placeholder: "@customer.email@", reason: {:path_not_found, ["customer", "email"]}}
+      #     ]
+      #   }}
 
       # Structural error cases
       Ootempl.render("missing.docx", %{}, "out.docx")
