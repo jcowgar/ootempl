@@ -223,16 +223,69 @@ defmodule Ootempl do
 
   @spec process_template(Path.t(), map(), Path.t()) :: :ok | {:error, term()}
   defp process_template(temp_dir, data, output_path) do
-    with {:ok, xml_content} <- load_document_xml(temp_dir),
+    with :ok <- process_single_xml_file(temp_dir, "word/document.xml", data),
+         :ok <- process_header_footer_files(temp_dir, data),
+         {:ok, file_map} <- build_file_map(temp_dir) do
+      Archive.create(file_map, output_path)
+    end
+  end
+
+  # Processes a single XML file through the full replacement pipeline.
+  #
+  # Applies the complete processing pipeline to a single XML file:
+  # - Load XML content
+  # - Parse XML
+  # - Normalize (collapse fragmented placeholders)
+  # - Process tables (if any)
+  # - Replace placeholders
+  # - Serialize back to XML
+  # - Save to disk
+  @spec process_single_xml_file(Path.t(), String.t(), map()) :: :ok | {:error, term()}
+  defp process_single_xml_file(temp_dir, relative_path, data) do
+    file_path = Path.join(temp_dir, relative_path)
+
+    with {:ok, xml_content} <- File.read(file_path),
          {:ok, xml_doc} <- Xml.parse(xml_content),
          normalized_doc <- Normalizer.normalize(xml_doc),
          {:ok, table_processed_doc} <- process_tables(normalized_doc, data),
          {:ok, replaced_doc} <- Replacement.replace_in_document(table_processed_doc, data),
          {:ok, modified_xml} <- Xml.serialize(replaced_doc),
-         :ok <- save_document_xml(temp_dir, modified_xml),
-         {:ok, file_map} <- build_file_map(temp_dir) do
-      Archive.create(file_map, output_path)
+         :ok <- File.write(file_path, modified_xml) do
+      :ok
+    else
+      # PlaceholderError should be returned directly without wrapping
+      {:error, %Ootempl.PlaceholderError{} = error} -> {:error, error}
+      # Other errors are wrapped with context
+      {:error, reason} -> {:error, {:file_processing_failed, relative_path, reason}}
     end
+  end
+
+  # Discovers and processes all header and footer XML files in the document.
+  #
+  # Finds all `word/header*.xml` and `word/footer*.xml` files using Path.wildcard
+  # and applies the same processing pipeline used for the main document body.
+  #
+  # Missing header/footer files are OK (not all documents have them).
+  @spec process_header_footer_files(Path.t(), map()) :: :ok | {:error, term()}
+  defp process_header_footer_files(temp_dir, data) do
+    header_files = Path.wildcard(Path.join(temp_dir, "word/header*.xml"))
+    footer_files = Path.wildcard(Path.join(temp_dir, "word/footer*.xml"))
+
+    all_files = header_files ++ footer_files
+
+    # Convert absolute paths to relative paths
+    relative_files =
+      Enum.map(all_files, fn file_path ->
+        Path.relative_to(file_path, temp_dir)
+      end)
+
+    # Process each file
+    Enum.reduce_while(relative_files, :ok, fn relative_path, _acc ->
+      case process_single_xml_file(temp_dir, relative_path, data) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
   end
 
   @spec process_tables(Xml.xml_element(), map()) :: {:ok, Xml.xml_element()} | {:error, term()}
@@ -396,26 +449,6 @@ defmodule Ootempl do
 
       true ->
         :ok
-    end
-  end
-
-  @spec load_document_xml(Path.t()) :: {:ok, binary()} | {:error, term()}
-  defp load_document_xml(temp_dir) do
-    document_path = Path.join(temp_dir, "word/document.xml")
-
-    case File.read(document_path) do
-      {:ok, content} -> {:ok, content}
-      {:error, reason} -> {:error, {:read_failed, document_path, reason}}
-    end
-  end
-
-  @spec save_document_xml(Path.t(), String.t()) :: :ok | {:error, term()}
-  defp save_document_xml(temp_dir, xml_content) do
-    document_path = Path.join(temp_dir, "word/document.xml")
-
-    case File.write(document_path, xml_content) do
-      :ok -> :ok
-      {:error, reason} -> {:error, {:write_failed, document_path, reason}}
     end
   end
 
