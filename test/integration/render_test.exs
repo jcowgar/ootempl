@@ -381,6 +381,222 @@ defmodule Ootempl.Integration.RenderTest do
     end
   end
 
+  describe "table template processing" do
+    test "processes simple table template with list data" do
+      # Arrange
+      template_path = "test/fixtures/table_simple.docx"
+      data = %{
+        "title" => "Claims Report",
+        "claims" => [
+          %{"id" => "5565", "amount" => "100.50"},
+          %{"id" => "5566", "amount" => "250.00"}
+        ],
+        "total" => "350.50"
+      }
+      output_path = "test/fixtures/table_simple_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      assert File.exists?(output_path)
+
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      # Should have both claim IDs in output
+      assert output_xml =~ "5565"
+      assert output_xml =~ "5566"
+      assert output_xml =~ "100.50"
+      assert output_xml =~ "250.00"
+      assert output_xml =~ "350.50"
+
+      # Template placeholders should be replaced
+      refute output_xml =~ "@claims.id@"
+      refute output_xml =~ "@claims.amount@"
+    end
+
+    test "handles empty list by removing template row" do
+      # Arrange
+      template_path = "test/fixtures/table_simple.docx"
+      data = %{
+        "title" => "Empty Report",
+        "claims" => [],
+        "total" => "0.00"
+      }
+      output_path = "test/fixtures/table_empty_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      assert File.exists?(output_path)
+
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      # Should have total but no claim rows
+      assert output_xml =~ "0.00"
+      refute output_xml =~ "@claims.id@"
+    end
+
+    test "processes mixed table with header, template, and footer rows" do
+      # Arrange
+      template_path = "test/fixtures/table_mixed.docx"
+      data = %{
+        "claims" => [
+          %{"id" => "101", "amount" => "50.00"},
+          %{"id" => "102", "amount" => "75.00"}
+        ],
+        "total" => "125.00"
+      }
+      output_path = "test/fixtures/table_mixed_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      assert output_xml =~ "101"
+      assert output_xml =~ "102"
+      assert output_xml =~ "125.00"
+    end
+
+    test "processes multi-row template" do
+      # Arrange
+      template_path = "test/fixtures/table_multirow.docx"
+      data = %{
+        "orders" => [
+          %{"id" => "100", "product" => "Widget", "qty" => "5", "price" => "10.00"},
+          %{"id" => "101", "product" => "Gadget", "qty" => "3", "price" => "25.00"}
+        ]
+      }
+      output_path = "test/fixtures/table_multirow_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      assert output_xml =~ "100"
+      assert output_xml =~ "Widget"
+      assert output_xml =~ "101"
+      assert output_xml =~ "Gadget"
+    end
+
+    test "processes multiple tables in same document" do
+      # Arrange
+      template_path = "test/fixtures/table_multiple.docx"
+      data = %{
+        "claims" => [
+          %{"id" => "1", "amount" => "100"}
+        ],
+        "orders" => [
+          %{"id" => "A", "total" => "200"}
+        ]
+      }
+      output_path = "test/fixtures/table_multiple_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      assert output_xml =~ "1"
+      assert output_xml =~ "100"
+      assert output_xml =~ "A"
+      assert output_xml =~ "200"
+    end
+
+    test "combines table processing with regular variable replacement" do
+      # Arrange
+      template_path = "test/fixtures/table_with_variables.docx"
+      data = %{
+        "company_name" => "Acme Corp",
+        "report_date" => "2025-10-06",
+        "items" => [
+          %{"name" => "Product A", "price" => "50.00"}
+        ]
+      }
+      output_path = "test/fixtures/table_with_variables_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      # Check both regular variables and table items
+      assert output_xml =~ "Acme Corp"
+      assert output_xml =~ "2025-10-06"
+      assert output_xml =~ "Product A"
+      assert output_xml =~ "50.00"
+    end
+
+    test "table output is valid .docx that can be opened in Word" do
+      # Arrange
+      template_path = "test/fixtures/table_from_word.docx"
+      data = %{
+        "claims" => [
+          %{"id" => "999", "amount" => "999.99"}
+        ],
+        "total" => "999.99"
+      }
+      output_path = "test/fixtures/table_from_word_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      assert :ok = Ootempl.Validator.validate_docx(output_path)
+    end
+
+    @tag :skip
+    test "handles table without templates (regular variable replacement only)" do
+      # Arrange - table with no list placeholders, just regular variables
+      template_path = "test/fixtures/table_no_template.docx"
+      data = %{
+        "name" => "John",
+        "total" => "100"
+      }
+      output_path = "test/fixtures/table_no_template_output.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      assert output_xml =~ "John"
+      assert output_xml =~ "100"
+    end
+  end
+
   describe "manual verification guidance" do
     @tag :manual
     test "output can be opened in Microsoft Word (manual verification required)" do

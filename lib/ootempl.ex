@@ -11,12 +11,16 @@ defmodule Ootempl do
   - Load and parse .docx templates
   - Replace `@variable@` placeholders with dynamic content
   - Support nested data access with dot notation (`@customer.name@`)
+  - Dynamic table row generation from list data
+  - Multi-row table templates for complex layouts
   - Case-insensitive placeholder matching
-  - Preserve Word formatting (bold, italic, fonts)
+  - Preserve Word formatting (bold, italic, fonts, table borders, shading)
   - Generate valid .docx output files
   - Comprehensive validation and error handling
 
   ## Basic Usage
+
+  ### Simple Variable Replacement
 
   ```elixir
   # Render a template with placeholder replacement
@@ -29,6 +33,64 @@ defmodule Ootempl do
   #=> :ok
   ```
 
+  ### Table Templates
+
+  Table templates automatically duplicate rows based on list data. Template rows are
+  identified by placeholders that reference list items.
+
+  ```elixir
+  # Simple table template
+  data = %{
+    "title" => "Claims Report",
+    "claims" => [
+      %{"id" => 5565, "amount" => 100.50},
+      %{"id" => 5566, "amount" => 250.00}
+    ],
+    "total" => 350.50
+  }
+  Ootempl.render("invoice_template.docx", data, "invoice.docx")
+  #=> :ok
+  ```
+
+  Template structure in Word document:
+  ```
+  | Claim ID       | Amount           |  ← Header (no list placeholders)
+  | @claims.id@    | @claims.amount@  |  ← Template row (references "claims" list)
+  | Total          | @total@          |  ← Footer (single value)
+  ```
+
+  Generated output:
+  ```
+  | Claim ID  | Amount  |
+  | 5565      | 100.50  |
+  | 5566      | 250.00  |
+  | Total     | 350.50  |
+  ```
+
+  Multi-row templates are supported for complex table layouts:
+  ```elixir
+  data = %{
+    "orders" => [
+      %{"id" => 100, "product" => "Widget", "qty" => 5, "price" => 10.00},
+      %{"id" => 101, "product" => "Gadget", "qty" => 3, "price" => 25.00}
+    ]
+  }
+  ```
+
+  Template with two rows per order:
+  ```
+  | Order @orders.id@              |  ← Row 1 of template
+  | @orders.qty@x @orders.product@ @ $@orders.price@ each |  ← Row 2 of template
+  ```
+
+  Generated output duplicates both rows for each order:
+  ```
+  | Order 100           |
+  | 5x Widget @ $10.00 each |
+  | Order 101           |
+  | 3x Gadget @ $25.00 each |
+  ```
+
   ## Architecture
 
   The library is organized into several modules:
@@ -39,6 +101,7 @@ defmodule Ootempl do
   - `Ootempl.Placeholder` - Placeholder detection and parsing
   - `Ootempl.DataAccess` - Nested data access with case-insensitive matching
   - `Ootempl.Replacement` - Placeholder replacement in XML with formatting preservation
+  - `Ootempl.Table` - Table structure detection, template row identification, and duplication
   - `Ootempl.Validator` - Document validation and error handling
 
   ## Error Handling
@@ -58,6 +121,7 @@ defmodule Ootempl do
 
   alias Ootempl.Archive
   alias Ootempl.Replacement
+  alias Ootempl.Table
   alias Ootempl.Validator
   alias Ootempl.Xml
   alias Ootempl.Xml.Normalizer
@@ -162,11 +226,162 @@ defmodule Ootempl do
     with {:ok, xml_content} <- load_document_xml(temp_dir),
          {:ok, xml_doc} <- Xml.parse(xml_content),
          normalized_doc <- Normalizer.normalize(xml_doc),
-         {:ok, replaced_doc} <- Replacement.replace_in_document(normalized_doc, data),
+         {:ok, table_processed_doc} <- process_tables(normalized_doc, data),
+         {:ok, replaced_doc} <- Replacement.replace_in_document(table_processed_doc, data),
          {:ok, modified_xml} <- Xml.serialize(replaced_doc),
          :ok <- save_document_xml(temp_dir, modified_xml),
          {:ok, file_map} <- build_file_map(temp_dir) do
       Archive.create(file_map, output_path)
+    end
+  end
+
+  @spec process_tables(Xml.xml_element(), map()) :: {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_tables(xml_doc, data) do
+    # Find all tables in document
+    tables = Table.find_tables(xml_doc)
+
+    # Process each table and collect results
+    case process_all_tables(tables, data, xml_doc) do
+      {:ok, modified_doc} -> {:ok, modified_doc}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @spec process_all_tables([Xml.xml_element()], map(), Xml.xml_element()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_all_tables([], _data, xml_doc), do: {:ok, xml_doc}
+
+  defp process_all_tables([table | rest_tables], data, xml_doc) do
+    case process_single_table(table, data, xml_doc) do
+      {:ok, modified_doc} -> process_all_tables(rest_tables, data, modified_doc)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @spec process_single_table(Xml.xml_element(), map(), Xml.xml_element()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_single_table(table, data, xml_doc) do
+    rows = Table.extract_rows(table)
+
+    # Group template rows
+    case Table.group_template_rows(rows, data) do
+      {:ok, row_analyses} ->
+        # Find template row groups and duplicate
+        process_row_groups(table, row_analyses, data, xml_doc)
+
+      {:error, {:multiple_lists, _row}} = error ->
+        error
+    end
+  end
+
+  @spec process_row_groups(Xml.xml_element(), [Table.row_analysis()], map(), Xml.xml_element()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_row_groups(table, row_analyses, data, xml_doc) do
+    # Identify template row groups (consecutive template rows with same list_key)
+    template_groups = identify_template_groups(row_analyses)
+
+    # Process template groups in reverse order to maintain positions
+    modified_table =
+      template_groups
+      |> Enum.reverse()
+      |> Enum.reduce(table, fn group, acc_table ->
+        duplicate_and_replace_group(group, data, acc_table)
+      end)
+
+    # Replace the old table with modified table in the document
+    replace_table_in_doc(xml_doc, table, modified_table)
+  end
+
+  @spec identify_template_groups([Table.row_analysis()]) ::
+          [%{rows: [Xml.xml_element()], list_key: String.t(), position: non_neg_integer()}]
+  defp identify_template_groups(row_analyses) do
+    row_analyses
+    |> Enum.with_index()
+    |> Enum.reduce([], &add_template_row_to_groups/2)
+    |> Enum.reverse()
+  end
+
+  @spec add_template_row_to_groups({Table.row_analysis(), non_neg_integer()}, [map()]) :: [map()]
+  defp add_template_row_to_groups({analysis, index}, acc) do
+    if analysis.template? do
+      handle_template_row(analysis, index, acc)
+    else
+      acc
+    end
+  end
+
+  @spec handle_template_row(Table.row_analysis(), non_neg_integer(), [map()]) :: [map()]
+  defp handle_template_row(analysis, index, []), do:
+    [%{rows: [analysis.row], list_key: analysis.list_key, position: index}]
+
+  defp handle_template_row(analysis, _index, [current | rest])
+       when current.list_key == analysis.list_key do
+    updated_current = %{current | rows: current.rows ++ [analysis.row]}
+    [updated_current | rest]
+  end
+
+  defp handle_template_row(analysis, index, groups) do
+    [%{rows: [analysis.row], list_key: analysis.list_key, position: index} | groups]
+  end
+
+  @spec duplicate_and_replace_group(
+          %{rows: [Xml.xml_element()], list_key: String.t(), position: non_neg_integer()},
+          map(),
+          Xml.xml_element()
+        ) :: Xml.xml_element()
+  defp duplicate_and_replace_group(group, data, table) do
+    # Duplicate rows with scoped data
+    duplicated_with_data = Table.duplicate_rows(group.rows, group.list_key, data)
+
+    # Replace placeholders in each duplicated row
+    duplicated_rows =
+      Enum.map(duplicated_with_data, fn {row, scoped_data} ->
+        # Apply replacement to this row with scoped data
+        case Replacement.replace_in_document(row, scoped_data) do
+          {:ok, replaced_row} -> replaced_row
+          {:error, _} -> row
+        end
+      end)
+
+    # Insert duplicated rows first, then remove template rows
+    table
+    |> Table.insert_rows(duplicated_rows, group.position)
+    |> Table.remove_template_rows(group.rows)
+  end
+
+  @spec replace_table_in_doc(Xml.xml_element(), Xml.xml_element(), Xml.xml_element()) ::
+          {:ok, Xml.xml_element()}
+  defp replace_table_in_doc(xml_doc, old_table, new_table) do
+    # Traverse document and replace old table with new table
+    modified_doc = replace_element_in_tree(xml_doc, old_table, new_table)
+    {:ok, modified_doc}
+  end
+
+  @spec replace_element_in_tree(Xml.xml_element(), Xml.xml_element(), Xml.xml_element()) ::
+          Xml.xml_element()
+  defp replace_element_in_tree(element, old_element, new_element) do
+    import Ootempl.Xml
+
+    # If this is the element to replace, return the new one
+    if element == old_element do
+      new_element
+    else
+      # Otherwise, recursively process children
+      content = xmlElement(element, :content)
+      modified_content = Enum.map(content, &replace_node_in_tree(&1, old_element, new_element))
+      xmlElement(element, content: modified_content)
+    end
+  end
+
+  @spec replace_node_in_tree(Xml.xml_node(), Xml.xml_element(), Xml.xml_element()) ::
+          Xml.xml_node()
+  defp replace_node_in_tree(node, old_element, new_element) do
+    require Record
+
+    if Record.is_record(node, :xmlElement) do
+      replace_element_in_tree(node, old_element, new_element)
+    else
+      node
     end
   end
 
