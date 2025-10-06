@@ -306,6 +306,10 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
       # Arrange
       template_path = "test/fixtures/with_textboxes.docx"
       data = %{
+        "company_name" => "Test Corp",
+        "footer_text" => "Footer",
+        "header_textbox" => "Header Box",
+        "footer_textbox" => "Footer Box",
         "textbox_content" => "Important Notice",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
@@ -326,12 +330,15 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
       refute doc_xml =~ "@textbox_content@"
     end
 
-    @tag :skip
     test "replaces placeholders in text boxes within headers" do
       # Arrange
       template_path = "test/fixtures/with_textboxes.docx"
       data = %{
+        "company_name" => "Test Corp",
+        "footer_text" => "Footer",
         "header_textbox" => "Confidential",
+        "footer_textbox" => "Footer Box",
+        "textbox_content" => "Main Content",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
@@ -351,12 +358,15 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
       refute header_xml =~ "@header_textbox@"
     end
 
-    @tag :skip
     test "replaces placeholders in text boxes within footers" do
       # Arrange
       template_path = "test/fixtures/with_textboxes.docx"
       data = %{
+        "company_name" => "Test Corp",
+        "footer_text" => "Footer Text",
+        "header_textbox" => "Header Box",
         "footer_textbox" => "Page Footer",
+        "textbox_content" => "Main Content",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
