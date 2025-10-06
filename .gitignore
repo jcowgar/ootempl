@@ -23,10 +23,11 @@ ootempl-*.tar
 /tmp/
 
 # Test output files that are regenerated
-test/fixtures/manual_verification.docx
-test/fixtures/manual_inspection_output.docx
+test/fixtures/manual_*.docx
+test/fixtures/*_manual.docx
 
 # macOS files
 .DS_Store
+**/.DS_Store
 
 .decree.db
