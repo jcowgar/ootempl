@@ -88,10 +88,10 @@ defmodule Ootempl.Xml.Normalizer do
   across multiple runs, and collapses them into single runs. Proofing markers
   within placeholders are removed.
 
-  Formatting is preserved ONLY if all fragments of a placeholder have identical
-  formatting properties. If fragments have different formatting (e.g., "@na" bold
-  + "me@" italic), all formatting is stripped. This ensures template creators
-  must format the entire placeholder consistently.
+  When fragments have inconsistent formatting, the most common formatting is applied
+  (majority rule). For example, if 3 fragments are bold and 2 are not, the result
+  will be bold. If all fragments have identical formatting, that formatting is preserved.
+  If there's a tie (equal counts of different formatting), all formatting is stripped.
 
   ## Parameters
 
@@ -213,43 +213,42 @@ defmodule Ootempl.Xml.Normalizer do
     end
   end
 
-  # Check if all formatting properties are identical
+  # Check formatting consistency and return the most common formatting (majority rule)
   @spec check_formatting_consistency([Ootempl.Xml.xml_element() | nil]) ::
           Ootempl.Xml.xml_element() | nil
-  defp check_formatting_consistency([nil | _rest]), do: nil
-
   defp check_formatting_consistency(properties) do
-    # Check if all properties are the same
-    first_props = List.first(properties)
-
-    all_same =
-      Enum.all?(properties, fn props ->
-        formatting_equal?(props, first_props)
+    # Count occurrences of each unique formatting
+    frequency_map =
+      Enum.reduce(properties, %{}, fn props, acc ->
+        key = serialize_props(props)
+        Map.update(acc, key, {props, 1}, fn {existing_props, count} ->
+          {existing_props, count + 1}
+        end)
       end)
 
-    if all_same do
-      first_props
-    else
-      # Inconsistent formatting - strip all
-      nil
+    # Find the formatting with the highest count
+    case Enum.max_by(frequency_map, fn {_key, {_props, count}} -> count end, fn -> nil end) do
+      {_key, {props, max_count}} ->
+        # Check if there's a tie - if multiple formattings have the same max count, strip all
+        tie_exists =
+          frequency_map
+          |> Enum.filter(fn {_key, {_props, count}} -> count == max_count end)
+          |> length() > 1
+
+        if tie_exists do
+          nil
+        else
+          props
+        end
+
+      nil ->
+        nil
     end
   end
 
-  # Check if two formatting property elements are equal
-  @spec formatting_equal?(
-          Ootempl.Xml.xml_element() | nil,
-          Ootempl.Xml.xml_element() | nil
-        ) :: boolean()
-  defp formatting_equal?(nil, nil), do: true
-  defp formatting_equal?(nil, _), do: false
-  defp formatting_equal?(_, nil), do: false
+  @spec serialize_props(Ootempl.Xml.xml_element() | nil) :: String.t()
+  defp serialize_props(nil), do: "nil"
 
-  defp formatting_equal?(props1, props2) do
-    # Compare by serializing the properties
-    serialize_props(props1) == serialize_props(props2)
-  end
-
-  @spec serialize_props(Ootempl.Xml.xml_element()) :: String.t()
   defp serialize_props(props) do
     # Serialize properties for comparison
     props
