@@ -327,8 +327,8 @@ defmodule Ootempl.Table do
 
     # For each list item, clone all template rows and scope data
     Enum.flat_map(list_data, fn list_item ->
-      # Merge list item with parent data
-      scoped_data = scope_data(list_item, parent_data)
+      # Create scoped data with list item nested under list key
+      scoped_data = Map.put(parent_data, list_key, list_item)
 
       # Clone each template row and pair with scoped data
       Enum.map(template_rows, fn row ->

@@ -802,8 +802,8 @@ defmodule Ootempl.TableTest do
       Enum.each(result, fn {row, scoped_data} ->
         assert element_name(row) == "w:tr"
         assert scoped_data["first_name"] == "John"
-        assert is_integer(scoped_data["id"])
-        assert scoped_data["id"] in [1, 2, 3]
+        assert is_integer(scoped_data["claims"]["id"])
+        assert scoped_data["claims"]["id"] in [1, 2, 3]
       end)
     end
 
@@ -840,16 +840,16 @@ defmodule Ootempl.TableTest do
       {_row1_dup1, data1} = Enum.at(result, 0)
       {_row2_dup1, data2} = Enum.at(result, 1)
       assert data1["company"] == "Acme"
-      assert data1["id"] == 100
-      assert data1["date"] == "2024-01-01"
+      assert data1["claims"]["id"] == 100
+      assert data1["claims"]["date"] == "2024-01-01"
       assert data2 == data1
 
       # Second group (item 2)
       {_row1_dup2, data3} = Enum.at(result, 2)
       {_row2_dup2, data4} = Enum.at(result, 3)
       assert data3["company"] == "Acme"
-      assert data3["id"] == 200
-      assert data3["date"] == "2024-01-02"
+      assert data3["claims"]["id"] == 200
+      assert data3["claims"]["date"] == "2024-01-02"
       assert data4 == data3
     end
 
@@ -915,7 +915,7 @@ defmodule Ootempl.TableTest do
       # Assert
       assert length(result) == 1
       {_row, scoped_data} = hd(result)
-      assert scoped_data["value"] == "only one"
+      assert scoped_data["items"]["value"] == "only one"
     end
 
     test "handles large list (100+ items)" do
@@ -941,8 +941,8 @@ defmodule Ootempl.TableTest do
       # Verify first and last items
       {_first_row, first_data} = hd(result)
       {_last_row, last_data} = List.last(result)
-      assert first_data["index"] == 1
-      assert last_data["index"] == 150
+      assert first_data["items"]["index"] == 1
+      assert last_data["items"]["index"] == 150
     end
 
     test "handles missing list key by treating as empty list" do
