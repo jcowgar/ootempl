@@ -37,32 +37,48 @@ defmodule Ootempl.ReplacementTest do
 
     element
     |> xmlElement(:content)
-    |> Enum.flat_map(fn node ->
-      cond do
-        is_record(node, :xmlElement) ->
-          name = xmlElement(node, :name)
-
-          if name == :"w:t" or name == :t do
-            # Extract text directly from w:t elements
-            node
-            |> xmlElement(:content)
-            |> Enum.map(fn text_node ->
-              if is_record(text_node, :xmlText) do
-                text_node |> xmlText(:value) |> List.to_string()
-              else
-                ""
-              end
-            end)
-          else
-            # Recurse into other elements
-            [extract_all_text(node)]
-          end
-
-        true ->
-          [""]
-      end
-    end)
+    |> Enum.flat_map(&extract_text_from_node/1)
     |> Enum.join()
+  end
+
+  defp extract_text_from_node(node) do
+    import Record
+
+    if is_record(node, :xmlElement) do
+      extract_text_from_element(node)
+    else
+      [""]
+    end
+  end
+
+  defp extract_text_from_element(element) do
+    import Record
+
+    name = xmlElement(element, :name)
+
+    if name == :"w:t" or name == :t do
+      extract_text_content(element)
+    else
+      [extract_all_text(element)]
+    end
+  end
+
+  defp extract_text_content(element) do
+    import Record
+
+    element
+    |> xmlElement(:content)
+    |> Enum.map(&text_node_to_string/1)
+  end
+
+  defp text_node_to_string(node) do
+    import Record
+
+    if is_record(node, :xmlText) do
+      node |> xmlText(:value) |> List.to_string()
+    else
+      ""
+    end
   end
 
   describe "xml_escape/1" do

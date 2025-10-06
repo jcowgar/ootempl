@@ -45,6 +45,7 @@ defmodule Ootempl do
   """
 
   alias Ootempl.Archive
+  alias Ootempl.Replacement
   alias Ootempl.Validator
   alias Ootempl.Xml
   alias Ootempl.Xml.Normalizer
@@ -53,35 +54,44 @@ defmodule Ootempl do
   Renders a .docx template with data to generate an output document.
 
   This is the primary public API for the Ootempl library. It orchestrates
-  template loading, processing, and saving with comprehensive validation.
+  template loading, placeholder replacement, and saving with comprehensive validation.
 
-  For the foundational epic, rendering performs a valid round-trip
-  (load template → save as output) without placeholder replacement, proving
-  the infrastructure works end-to-end. Future epics will extend this to use
-  the `data` parameter for actual template transformations.
+  Replaces `@variable@` placeholders in the template with values from the data map,
+  supporting nested data access with dot notation (e.g., `@customer.name@`).
+  Case-insensitive matching ensures `@Name@`, `@name@`, and `@NAME@` all match
+  the same data key.
 
   ## Parameters
 
   - `template_path` - Path to the .docx template file
-  - `data` - Map of data for placeholder replacement (currently unused, for future)
+  - `data` - Map of data for placeholder replacement (string keys)
   - `output_path` - Path where the generated .docx file should be saved
 
   ## Returns
 
   - `:ok` on success
-  - `{:error, exception}` on failure with specific error details
+  - `{:error, errors}` when placeholders cannot be resolved (list of error details)
+  - `{:error, exception}` on structural failures (invalid file, corrupt ZIP, etc.)
 
   ## Examples
 
-      # Validate round-trip (current implementation)
+      # Successful replacement
+      data = %{
+        "name" => "John Doe",
+        "customer" => %{"email" => "john@example.com"},
+        "total" => 99.99
+      }
+      Ootempl.render("template.docx", data, "output.docx")
+      #=> :ok
+
+      # Missing placeholders (collects all errors)
       Ootempl.render("template.docx", %{}, "output.docx")
-      #=> :ok
+      #=> {:error, [
+      #     {:placeholder_not_found, "@name@", {:path_not_found, ["name"]}},
+      #     {:placeholder_not_found, "@customer.email@", {:path_not_found, ["customer", "email"]}}
+      #   ]}
 
-      # Future usage with placeholder replacement
-      Ootempl.render("invoice.docx", %{total: 1500, client: "Acme"}, "invoice_001.docx")
-      #=> :ok
-
-      # Error cases
+      # Structural error cases
       Ootempl.render("missing.docx", %{}, "out.docx")
       #=> {:error, %Ootempl.ValidationError{reason: :file_not_found}}
 
@@ -90,22 +100,29 @@ defmodule Ootempl do
 
   ## Error Cases
 
+  ### Structural Errors (fail-fast)
   - Template file does not exist
   - Template is not a valid .docx file
   - Template and output are the same file
   - Output directory does not exist or is not writable
   - Insufficient disk space
   - Template file is locked/in use
+
+  ### Placeholder Errors (collected and returned together)
+  - Placeholder not found in data map
+  - Invalid nested path
+  - Nil values in data
+  - Unsupported data types (maps, lists as values)
   """
   @spec render(Path.t(), map(), Path.t()) :: :ok | {:error, term()}
-  def render(template_path, _data, output_path) do
+  def render(template_path, data, output_path) do
     with :ok <- validate_paths(template_path, output_path),
          :ok <- Validator.validate_docx(template_path) do
       # Extract template and ensure cleanup happens regardless of success or failure
       case Archive.extract(template_path) do
         {:ok, temp_dir} ->
           # Process template and always cleanup temp directory, even on error
-          result = process_template(temp_dir, output_path)
+          result = process_template(temp_dir, data, output_path)
           cleanup_result = Archive.cleanup(temp_dir)
 
           # Return original result or cleanup error
@@ -125,12 +142,13 @@ defmodule Ootempl do
 
   # Private functions
 
-  @spec process_template(Path.t(), Path.t()) :: :ok | {:error, term()}
-  defp process_template(temp_dir, output_path) do
+  @spec process_template(Path.t(), map(), Path.t()) :: :ok | {:error, term()}
+  defp process_template(temp_dir, data, output_path) do
     with {:ok, xml_content} <- load_document_xml(temp_dir),
          {:ok, xml_doc} <- Xml.parse(xml_content),
          normalized_doc <- Normalizer.normalize(xml_doc),
-         {:ok, modified_xml} <- Xml.serialize(normalized_doc),
+         {:ok, replaced_doc} <- Replacement.replace_in_document(normalized_doc, data),
+         {:ok, modified_xml} <- Xml.serialize(replaced_doc),
          :ok <- save_document_xml(temp_dir, modified_xml),
          {:ok, file_map} <- build_file_map(temp_dir) do
       Archive.create(file_map, output_path)

@@ -21,11 +21,163 @@ defmodule Ootempl.Integration.RenderTest do
     :ok
   end
 
+  describe "variable replacement" do
+    test "replaces simple placeholders with data values" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{
+        "person" => %{"first_name" => "Marty McFly"},
+        "date" => "October 26, 1985"
+      }
+      output_path = @output_path
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      assert File.exists?(output_path)
+
+      # Verify output is valid .docx
+      assert :ok = Ootempl.Validator.validate_docx(output_path)
+
+      # Verify placeholders were replaced
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Marty McFly"
+      assert output_xml =~ "October 26, 1985"
+      refute output_xml =~ "@person.first_name@"
+      refute output_xml =~ "@date@"
+    end
+
+    test "replaces nested data placeholders" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{
+        "person" => %{"first_name" => "George McFly"},
+        "date" => "November 5, 1955"
+      }
+      output_path = @output_path
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "George McFly"
+      assert output_xml =~ "November 5, 1955"
+    end
+
+    test "converts numbers to strings during replacement" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{
+        "person" => %{"first_name" => "88"},
+        "date" => 1985
+      }
+      output_path = @output_path
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "1985"
+      assert output_xml =~ "88"
+    end
+
+    test "handles case-insensitive placeholder matching" do
+      # Arrange
+      template_path = @test_fixture
+      # Template has @person.first_name@ and @date@ but we provide different case
+      data = %{
+        "PERSON" => %{"FIRST_NAME" => "Biff Tannen"},
+        "Date" => "November 12, 1955"
+      }
+      output_path = @output_path
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Biff Tannen"
+      assert output_xml =~ "November 12, 1955"
+    end
+
+    test "returns error when placeholder data is missing" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{} # Empty data, placeholders exist in template
+
+      # Act
+      result = Ootempl.render(template_path, data, @output_path)
+
+      # Assert
+      assert {:error, errors} = result
+      assert is_list(errors)
+      assert length(errors) > 0
+
+      # Check error structure
+      [{:placeholder_not_found, placeholder, reason} | _] = errors
+      assert is_binary(placeholder)
+      assert String.starts_with?(placeholder, "@")
+      assert String.ends_with?(placeholder, "@")
+      assert {:path_not_found, _path} = reason
+    end
+
+    test "collects all placeholder errors together" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{"date" => "1985"} # Only one field, template needs 2
+
+      # Act
+      result = Ootempl.render(template_path, data, @output_path)
+
+      # Assert
+      assert {:error, errors} = result
+      assert is_list(errors)
+      # Template should have @person.first_name@ missing
+      assert length(errors) >= 1
+    end
+
+    test "escapes XML special characters in replacement values" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{
+        "person" => %{"first_name" => "Doc & Marty"},
+        "date" => "<Back to the Future>"
+      }
+      output_path = @output_path
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+
+      # XML should be well-formed (escaped properly)
+      assert {:ok, _parsed} = Ootempl.Xml.parse(output_xml)
+
+      # Values should be escaped (double-escaped in serialized XML)
+      # Our code escapes once, then xmerl escapes again during serialization
+      assert output_xml =~ "&amp;amp;"  # & -> &amp; -> &amp;amp;
+      assert output_xml =~ "&amp;lt;"   # < -> &lt; -> &amp;lt;
+      assert output_xml =~ "&amp;gt;"   # > -> &gt; -> &amp;gt;
+    end
+  end
+
   describe "end-to-end template rendering" do
     test "renders real .docx template and produces valid output" do
       # Arrange
       template_path = @test_fixture
-      data = %{}
+      data = %{
+        "person" => %{"first_name" => "Test User"},
+        "date" => "2025-10-06"
+      }
       output_path = @output_path
 
       # Act
@@ -43,9 +195,10 @@ defmodule Ootempl.Integration.RenderTest do
       # Arrange
       template_path = @test_fixture
       output_path = @output_path
+      data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, data, output_path)
 
       # Assert - verify ZIP structure
       assert {:ok, zip_handle} = :zip.zip_open(to_charlist(output_path), [:memory])
@@ -63,9 +216,10 @@ defmodule Ootempl.Integration.RenderTest do
       # Arrange
       template_path = @test_fixture
       output_path = @output_path
+      data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, data, output_path)
 
       # Assert - extract and validate document.xml
       {:ok, xml_content} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
@@ -81,13 +235,14 @@ defmodule Ootempl.Integration.RenderTest do
       # Arrange
       template_path = @test_fixture
       output_path = @output_path
+      data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       # Get original document.xml
       {:ok, original_xml} = Ootempl.Archive.extract_file(template_path, "word/document.xml")
       {:ok, original_doc} = Ootempl.Xml.parse(original_xml)
 
       # Act - render template
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, data, output_path)
 
       # Assert - compare XML structure
       {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
@@ -104,6 +259,7 @@ defmodule Ootempl.Integration.RenderTest do
       # Arrange
       template_path = @test_fixture
       output_path = @output_path
+      data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       # Get template file list
       {:ok, zip_handle} = :zip.zip_open(to_charlist(template_path), [:memory])
@@ -117,7 +273,7 @@ defmodule Ootempl.Integration.RenderTest do
         end
 
       # Act
-      Ootempl.render(template_path, %{}, output_path)
+      Ootempl.render(template_path, data, output_path)
 
       # Assert - output has same number of files
       {:ok, zip_handle} = :zip.zip_open(to_charlist(output_path), [:memory])
@@ -138,6 +294,7 @@ defmodule Ootempl.Integration.RenderTest do
       template_path = @test_fixture
       output1 = "test/fixtures/multi_output1.docx"
       output2 = "test/fixtures/multi_output2.docx"
+      data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       on_exit(fn ->
         File.rm(output1)
@@ -145,8 +302,8 @@ defmodule Ootempl.Integration.RenderTest do
       end)
 
       # Act - render twice
-      result1 = Ootempl.render(template_path, %{}, output1)
-      result2 = Ootempl.render(template_path, %{}, output2)
+      result1 = Ootempl.render(template_path, data, output1)
+      result2 = Ootempl.render(template_path, data, output2)
 
       # Assert
       assert result1 == :ok
@@ -163,9 +320,10 @@ defmodule Ootempl.Integration.RenderTest do
       # Arrange
       absolute_template = Path.expand(@test_fixture)
       relative_output = @output_path
+      data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       # Act
-      result = Ootempl.render(absolute_template, %{}, relative_output)
+      result = Ootempl.render(absolute_template, data, relative_output)
 
       # Assert
       assert result == :ok
@@ -185,7 +343,7 @@ defmodule Ootempl.Integration.RenderTest do
       end)
 
       # Act
-      result = Ootempl.render(corrupted_path, %{}, @output_path)
+      result = Ootempl.render(corrupted_path, %{"name" => "Test"}, @output_path)
 
       # Assert
       assert {:error, %Ootempl.InvalidArchiveError{}} = result
@@ -210,7 +368,7 @@ defmodule Ootempl.Integration.RenderTest do
         |> length()
 
       # Act - should fail
-      Ootempl.render(corrupted_path, %{}, @output_path)
+      Ootempl.render(corrupted_path, %{"name" => "Test"}, @output_path)
 
       # Assert - no new temp directories left
       temp_dirs_after =
@@ -229,6 +387,10 @@ defmodule Ootempl.Integration.RenderTest do
       # Arrange
       template_path = @test_fixture
       output_path = "test/fixtures/manual_verification.docx"
+      data = %{
+        "person" => %{"first_name" => "Marty McFly"},
+        "date" => "October 26, 1985"
+      }
 
       on_exit(fn ->
         # Don't delete - leave for manual verification
@@ -237,7 +399,7 @@ defmodule Ootempl.Integration.RenderTest do
       end)
 
       # Act
-      result = Ootempl.render(template_path, %{}, output_path)
+      result = Ootempl.render(template_path, data, output_path)
 
       # Assert
       assert result == :ok

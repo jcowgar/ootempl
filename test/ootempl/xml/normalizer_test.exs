@@ -609,7 +609,6 @@ defmodule Ootempl.Xml.NormalizerTest do
     @test_name "Marty McFly"
     @test_date "October 21, 2015"  # The date Marty travels to in Back to the Future II
     @output_path_temp "test/fixtures/replacement_test_output.docx"
-    @output_path_manual "test/fixtures/manual_inspection_output.docx"
 
     test "replaces placeholders in normalized document" do
       # Arrange
@@ -689,80 +688,7 @@ defmodule Ootempl.Xml.NormalizerTest do
       end
     end
 
-    @tag :manual
-    test "creates inspection file with replaced placeholders" do
-      # Arrange
-      {:ok, xml_content} = Ootempl.Archive.extract_file(@fixture_path, "word/document.xml")
-      {:ok, doc} = Ootempl.Xml.parse(xml_content)
-
-      # Data for replacement using DataAccess
-      data = %{
-        "person" => %{
-          "first_name" => @test_name
-        },
-        "date" => @test_date
-      }
-
-      # Act - normalize
-      normalized_doc = Normalizer.normalize(doc)
-
-      # Serialize and do data-driven replacement
-      {:ok, serialized} = Ootempl.Xml.serialize(normalized_doc)
-
-      # Replace placeholders using DataAccess
-      replaced_xml = replace_placeholders_in_xml(serialized, data)
-
-      # Save to manual inspection file
-      output_path = @output_path_manual
-
-      # Extract the full template to a temp dir
-      {:ok, temp_dir} = Ootempl.Archive.extract(@fixture_path)
-
-      try do
-        # Write the modified document.xml
-        document_path = Path.join(temp_dir, "word/document.xml")
-        File.write!(document_path, replaced_xml)
-
-        # Collect all files from temp dir
-        {:ok, file_map} = build_file_map_for_test(temp_dir)
-
-        # Create the output .docx
-        :ok = Ootempl.Archive.create(file_map, output_path)
-
-        IO.puts("""
-
-        ========================================
-        MANUAL INSPECTION FILE CREATED
-        ========================================
-
-        Output file saved to:
-        #{Path.expand(output_path)}
-
-        Replacements made:
-        - @person.first_name@ → #{@test_name}
-        - @date@ → #{@test_date}
-
-        Please open in Microsoft Word to verify:
-        1. File opens without errors
-        2. Placeholders are replaced correctly
-        3. Text appears as: "Hello #{@test_name}, how are you on this #{@test_date}?"
-        4. No corruption warnings
-
-        To run this test:
-        mix test --only manual test/ootempl/xml/normalizer_test.exs
-
-        ========================================
-        """)
-
-        # Assert - just verify file was created
-        assert File.exists?(output_path)
-      after
-        # Cleanup temp directory
-        Ootempl.Archive.cleanup(temp_dir)
-      end
-    end
-
-    # Helper for this manual test
+    # Helper functions for placeholder replacement tests
     defp build_file_map_for_test(temp_dir) do
       case gather_files_for_test(temp_dir, temp_dir) do
         {:ok, file_map} -> {:ok, file_map}
