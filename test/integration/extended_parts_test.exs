@@ -15,11 +15,13 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "replaces placeholders in footnotes" do
       # Arrange
       template_path = "test/fixtures/with_footnotes.docx"
+
       data = %{
         "footnote_ref" => "Smith et al., 2020",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/footnotes_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -39,10 +41,12 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "handles documents without footnotes gracefully" do
       # Arrange - document with no footnotes
       template_path = "test/fixtures/Simple Placeholdes from Word.docx"
+
       data = %{
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/no_footnotes_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -58,11 +62,13 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "reports placeholder errors from footnotes" do
       # Arrange
       template_path = "test/fixtures/with_footnotes.docx"
+
       data = %{
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
         # Missing: footnote_ref
       }
+
       output_path = "test/fixtures/footnotes_error_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -80,11 +86,13 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
       # Arrange
       # Create a fixture with nested data placeholder
       template_path = "test/fixtures/with_footnotes.docx"
+
       data = %{
         "footnote_ref" => "Smith et al., 2020",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/footnotes_nested_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -104,11 +112,13 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "replaces placeholders in endnotes" do
       # Arrange
       template_path = "test/fixtures/with_endnotes.docx"
+
       data = %{
         "endnote_text" => "Additional reference material",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/endnotes_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -128,10 +138,12 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "handles documents without endnotes gracefully" do
       # Arrange - document with no endnotes
       template_path = "test/fixtures/Simple Placeholdes from Word.docx"
+
       data = %{
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/no_endnotes_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -147,11 +159,13 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "reports placeholder errors from endnotes" do
       # Arrange
       template_path = "test/fixtures/with_endnotes.docx"
+
       data = %{
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
         # Missing: endnote_text
       }
+
       output_path = "test/fixtures/endnotes_error_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -170,6 +184,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "replaces placeholders in core properties (title, subject, creator)" do
       # Arrange
       template_path = "test/fixtures/with_properties.docx"
+
       data = %{
         "document_title" => "Annual Report 2025",
         "subject" => "Financial Analysis",
@@ -179,6 +194,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/properties_core_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -202,6 +218,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "replaces placeholders in app properties (company, manager)" do
       # Arrange
       template_path = "test/fixtures/with_properties.docx"
+
       data = %{
         "document_title" => "Test Document",
         "subject" => "Test Subject",
@@ -211,6 +228,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/properties_app_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -232,10 +250,12 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "handles documents without custom properties gracefully" do
       # Arrange - document with no custom properties
       template_path = "test/fixtures/Simple Placeholdes from Word.docx"
+
       data = %{
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/no_properties_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -251,11 +271,13 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "reports placeholder errors from document properties" do
       # Arrange
       template_path = "test/fixtures/with_properties.docx"
+
       data = %{
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
         # Missing: document_title, company_name, etc.
       }
+
       output_path = "test/fixtures/properties_error_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -273,6 +295,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "handles special XML characters in property values" do
       # Arrange
       template_path = "test/fixtures/with_properties.docx"
+
       data = %{
         "document_title" => "Q&A Report <Draft>",
         "subject" => "Test & Review",
@@ -282,6 +305,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/properties_special_chars_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -305,6 +329,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "replaces placeholders in text boxes within document body" do
       # Arrange
       template_path = "test/fixtures/with_textboxes.docx"
+
       data = %{
         "company_name" => "Test Corp",
         "footer_text" => "Footer",
@@ -314,6 +339,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/textbox_body_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -333,6 +359,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "replaces placeholders in text boxes within headers" do
       # Arrange
       template_path = "test/fixtures/with_textboxes.docx"
+
       data = %{
         "company_name" => "Test Corp",
         "footer_text" => "Footer",
@@ -342,6 +369,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/textbox_header_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -361,6 +389,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "replaces placeholders in text boxes within footers" do
       # Arrange
       template_path = "test/fixtures/with_textboxes.docx"
+
       data = %{
         "company_name" => "Test Corp",
         "footer_text" => "Footer Text",
@@ -370,6 +399,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/textbox_footer_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -391,6 +421,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "processes all extended parts together (footnotes, endnotes, properties)" do
       # Arrange
       template_path = "test/fixtures/comprehensive_template.docx"
+
       data = %{
         "document_title" => "Full Document",
         "company_name" => "Test Corp",
@@ -399,6 +430,7 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
         "person" => %{"first_name" => "Test User"},
         "date" => "2025-10-06"
       }
+
       output_path = "test/fixtures/comprehensive_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -429,10 +461,12 @@ defmodule Ootempl.Integration.ExtendedPartsTest do
     test "collects placeholder errors from all document parts" do
       # Arrange - template with placeholders in multiple parts
       template_path = "test/fixtures/comprehensive_template.docx"
+
       data = %{
         # Provide only some values, leaving others missing
         "document_title" => "Partial Data"
       }
+
       output_path = "test/fixtures/comprehensive_error_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)

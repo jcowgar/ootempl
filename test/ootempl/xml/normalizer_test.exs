@@ -2,6 +2,7 @@ defmodule Ootempl.Xml.NormalizerTest do
   use ExUnit.Case, async: true
 
   import Ootempl.Xml
+
   alias Ootempl.Xml.Normalizer
 
   require Record
@@ -24,21 +25,22 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "normalizes paragraphs within document" do
       # Simple document with a paragraph containing a fragmented placeholder
-      xml = ~s(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>@na</w:t></w:r><w:r><w:t>me@</w:t></w:r></w:p></w:body></w:document>)
+      xml =
+        ~s(<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>@na</w:t></w:r><w:r><w:t>me@</w:t></w:r></w:p></w:body></w:document>)
 
       {:ok, doc} = Ootempl.Xml.parse(xml)
       normalized = Normalizer.normalize(doc)
 
       # Extract the paragraph
-      body = Ootempl.Xml.find_elements(normalized, :"w:body") |> hd()
-      para = Ootempl.Xml.find_elements(body, :"w:p") |> hd()
+      body = normalized |> Ootempl.Xml.find_elements(:"w:body") |> hd()
+      para = body |> Ootempl.Xml.find_elements(:"w:p") |> hd()
       runs = Ootempl.Xml.find_elements(para, :"w:r")
 
       # Should have one run after normalization
       assert length(runs) == 1
 
       # The run should contain the complete placeholder
-      run_text = extract_text_from_run(runs |> hd())
+      run_text = runs |> hd() |> extract_text_from_run()
       assert run_text == "@name@"
     end
   end
@@ -46,10 +48,11 @@ defmodule Ootempl.Xml.NormalizerTest do
   describe "normalize_paragraph/1" do
     test "collapses simple fragmented placeholder across two runs" do
       # Arrange
-      para = create_paragraph([
-        create_run("@na"),
-        create_run("me@")
-      ])
+      para =
+        create_paragraph([
+          create_run("@na"),
+          create_run("me@")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -62,11 +65,12 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "collapses placeholder fragmented across three runs" do
       # Arrange
-      para = create_paragraph([
-        create_run("@person"),
-        create_run(".first"),
-        create_run("_name@")
-      ])
+      para =
+        create_paragraph([
+          create_run("@person"),
+          create_run(".first"),
+          create_run("_name@")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -79,11 +83,12 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "collapses placeholder with surrounding text" do
       # Arrange
-      para = create_paragraph([
-        create_run("Hello @"),
-        create_run("name"),
-        create_run("@!")
-      ])
+      para =
+        create_paragraph([
+          create_run("Hello @"),
+          create_run("name"),
+          create_run("@!")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -96,13 +101,14 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "handles multiple fragmented placeholders in same paragraph" do
       # Arrange
-      para = create_paragraph([
-        create_run("@first"),
-        create_run("@"),
-        create_run(" and "),
-        create_run("@se"),
-        create_run("cond@")
-      ])
+      para =
+        create_paragraph([
+          create_run("@first"),
+          create_run("@"),
+          create_run(" and "),
+          create_run("@se"),
+          create_run("cond@")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -119,11 +125,12 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "strips proofing markers between runs" do
       # Arrange
-      para = create_paragraph([
-        create_run("@na"),
-        create_proofing_error(),
-        create_run("me@")
-      ])
+      para =
+        create_paragraph([
+          create_run("@na"),
+          create_proofing_error(),
+          create_run("me@")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -132,8 +139,8 @@ defmodule Ootempl.Xml.NormalizerTest do
       content = xmlElement(normalized, :content)
       # Should not contain proofing errors
       refute Enum.any?(content, fn node ->
-        Record.is_record(node, :xmlElement) && xmlElement(node, :name) == :"w:proofErr"
-      end)
+               Record.is_record(node, :xmlElement) && xmlElement(node, :name) == :"w:proofErr"
+             end)
 
       # Should have one run with complete placeholder
       runs = Ootempl.Xml.find_elements(normalized, :"w:r")
@@ -145,10 +152,11 @@ defmodule Ootempl.Xml.NormalizerTest do
       # Arrange
       bold_props = create_run_properties([create_bold()])
 
-      para = create_paragraph([
-        create_run("@na", bold_props),
-        create_run("me@", bold_props)
-      ])
+      para =
+        create_paragraph([
+          create_run("@na", bold_props),
+          create_run("me@", bold_props)
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -170,10 +178,11 @@ defmodule Ootempl.Xml.NormalizerTest do
       bold_props = create_run_properties([create_bold()])
       italic_props = create_run_properties([create_italic()])
 
-      para = create_paragraph([
-        create_run("@na", bold_props),
-        create_run("me@", italic_props)
-      ])
+      para =
+        create_paragraph([
+          create_run("@na", bold_props),
+          create_run("me@", italic_props)
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -194,10 +203,11 @@ defmodule Ootempl.Xml.NormalizerTest do
       # Arrange - bold + plain fragments
       bold_props = create_run_properties([create_bold()])
 
-      para = create_paragraph([
-        create_run("@na", bold_props),
-        create_run("me@", nil)
-      ])
+      para =
+        create_paragraph([
+          create_run("@na", bold_props),
+          create_run("me@", nil)
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -218,10 +228,11 @@ defmodule Ootempl.Xml.NormalizerTest do
       # Arrange - bold+italic on both fragments
       bold_italic_props = create_run_properties([create_bold(), create_italic()])
 
-      para = create_paragraph([
-        create_run("@na", bold_italic_props),
-        create_run("me@", bold_italic_props)
-      ])
+      para =
+        create_paragraph([
+          create_run("@na", bold_italic_props),
+          create_run("me@", bold_italic_props)
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -237,7 +248,7 @@ defmodule Ootempl.Xml.NormalizerTest do
       r_pr = Ootempl.Xml.find_elements(run, :"w:rPr")
       assert length(r_pr) == 1
 
-      r_pr_content = hd(r_pr) |> xmlElement(:content)
+      r_pr_content = r_pr |> hd() |> xmlElement(:content)
       assert length(r_pr_content) == 2
       # Check that both bold and italic are present (order may vary)
       names = Enum.map(r_pr_content, fn elem -> xmlElement(elem, :name) end)
@@ -247,10 +258,11 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "does not collapse incomplete placeholders" do
       # Arrange
-      para = create_paragraph([
-        create_run("@incomplete"),
-        create_run(" text")
-      ])
+      para =
+        create_paragraph([
+          create_run("@incomplete"),
+          create_run(" text")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -263,10 +275,11 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "does not collapse non-placeholder text" do
       # Arrange
-      para = create_paragraph([
-        create_run("Hello "),
-        create_run("world")
-      ])
+      para =
+        create_paragraph([
+          create_run("Hello "),
+          create_run("world")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -291,9 +304,10 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "handles single run with placeholder" do
       # Arrange - single run that is already a complete placeholder
-      para = create_paragraph([
-        create_run("@name@")
-      ])
+      para =
+        create_paragraph([
+          create_run("@name@")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -306,9 +320,10 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "handles paragraph with only proofing markers" do
       # Arrange
-      para = create_paragraph([
-        create_proofing_error()
-      ])
+      para =
+        create_paragraph([
+          create_proofing_error()
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -333,11 +348,12 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "handles placeholder at end of paragraph with accumulated runs" do
       # Arrange - placeholder fragments that reach end of paragraph
-      para = create_paragraph([
-        create_run("Text "),
-        create_run("@na"),
-        create_run("me@")
-      ])
+      para =
+        create_paragraph([
+          create_run("Text "),
+          create_run("@na"),
+          create_run("me@")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -352,11 +368,13 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "handles non-run node after accumulated runs" do
       # Arrange - runs followed by non-run element
-      para = create_paragraph([
-        create_run("@incomplete"),
-        create_run(" text"),
-        create_paragraph_properties()  # Non-run node
-      ])
+      para =
+        create_paragraph([
+          create_run("@incomplete"),
+          create_run(" text"),
+          # Non-run node
+          create_paragraph_properties()
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -369,10 +387,11 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "handles text that starts building placeholder but stops" do
       # Arrange - text with @ but not a placeholder, then more text
-      para = create_paragraph([
-        create_run("Email: test"),
-        create_run("@example.com")
-      ])
+      para =
+        create_paragraph([
+          create_run("Email: test"),
+          create_run("@example.com")
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -385,10 +404,11 @@ defmodule Ootempl.Xml.NormalizerTest do
 
     test "strips formatting when all fragments have nil properties" do
       # Arrange - all plain text (nil properties)
-      para = create_paragraph([
-        create_run("@na", nil),
-        create_run("me@", nil)
-      ])
+      para =
+        create_paragraph([
+          create_run("@na", nil),
+          create_run("me@", nil)
+        ])
 
       # Act
       normalized = Normalizer.normalize_paragraph(para)
@@ -470,7 +490,7 @@ defmodule Ootempl.Xml.NormalizerTest do
 
       # No single run should contain the complete placeholder
       refute Enum.any?(texts, &String.contains?(&1, "@person.first_name@")),
-        "Placeholder should be fragmented across runs, not in single run"
+             "Placeholder should be fragmented across runs, not in single run"
 
       # But the combined text should contain it
       combined = Enum.join(texts, "")
@@ -507,7 +527,7 @@ defmodule Ootempl.Xml.NormalizerTest do
       placeholder_text = Enum.find(texts, &String.contains?(&1, "@person.first_name@"))
 
       assert placeholder_text != nil,
-        "After normalization, @person.first_name@ should be in a single run"
+             "After normalization, @person.first_name@ should be in a single run"
 
       # Verify it's detectable
       placeholders = Ootempl.Placeholder.detect(placeholder_text)
@@ -567,7 +587,7 @@ defmodule Ootempl.Xml.NormalizerTest do
         end)
 
       assert Enum.empty?(proofing_errors),
-        "All proofing error markers should be removed after normalization"
+             "All proofing error markers should be removed after normalization"
     end
 
     test "full round-trip with real fixture preserves structure" do
@@ -607,7 +627,8 @@ defmodule Ootempl.Xml.NormalizerTest do
 
   describe "placeholder replacement" do
     @test_name "Marty McFly"
-    @test_date "October 21, 2015"  # The date Marty travels to in Back to the Future II
+    # The date Marty travels to in Back to the Future II
+    @test_date "October 21, 2015"
     @output_path_temp "test/fixtures/replacement_test_output.docx"
 
     test "replaces placeholders in normalized document" do
@@ -794,14 +815,15 @@ defmodule Ootempl.Xml.NormalizerTest do
   defp create_run(text, run_props \\ nil) do
     text_node = xmlText(value: String.to_charlist(text))
 
-    text_element = xmlElement(
-      name: :"w:t",
-      content: [text_node],
-      attributes: [],
-      expanded_name: :"w:t",
-      nsinfo: {~c"w", ~c"t"},
-      namespace: xmlNamespace(nodes: [{~c"w", ~c"http://schemas.openxmlformats.org/wordprocessingml/2006/main"}])
-    )
+    text_element =
+      xmlElement(
+        name: :"w:t",
+        content: [text_node],
+        attributes: [],
+        expanded_name: :"w:t",
+        nsinfo: {~c"w", ~c"t"},
+        namespace: xmlNamespace(nodes: [{~c"w", ~c"http://schemas.openxmlformats.org/wordprocessingml/2006/main"}])
+      )
 
     content = if run_props, do: [run_props, text_element], else: [text_element]
 
@@ -874,9 +896,8 @@ defmodule Ootempl.Xml.NormalizerTest do
       text_elem
       |> xmlElement(:content)
       |> Enum.filter(&Record.is_record(&1, :xmlText))
-      |> Enum.map(&(xmlText(&1, :value) |> List.to_string()))
+      |> Enum.map(&(&1 |> xmlText(:value) |> List.to_string()))
     end)
     |> Enum.join()
   end
-
 end

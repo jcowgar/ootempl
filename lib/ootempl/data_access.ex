@@ -227,12 +227,10 @@ defmodule Ootempl.DataAccess do
     {atom_keys, string_keys} = Enum.split_with(available_keys, &is_atom/1)
 
     atom_matches =
-      atom_keys
-      |> Enum.filter(fn key -> key |> Atom.to_string() |> String.downcase() == lowercase_lookup end)
+      Enum.filter(atom_keys, fn key -> key |> Atom.to_string() |> String.downcase() == lowercase_lookup end)
 
     string_matches =
-      string_keys
-      |> Enum.filter(fn key -> String.downcase(key) == lowercase_lookup end)
+      Enum.filter(string_keys, fn key -> String.downcase(key) == lowercase_lookup end)
 
     {atom_matches, string_matches}
   end

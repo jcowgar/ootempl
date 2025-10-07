@@ -31,6 +31,7 @@ defmodule Ootempl.Xml.Normalizer do
   """
 
   import Ootempl.Xml
+
   alias Ootempl.Placeholder
 
   require Record
@@ -132,8 +133,7 @@ defmodule Ootempl.Xml.Normalizer do
 
   # Find a span of runs that contains a complete placeholder
   @spec find_placeholder_span([Ootempl.Xml.xml_node()]) ::
-          {:found, String.t(), [Ootempl.Xml.xml_element()], [Ootempl.Xml.xml_node()],
-           Ootempl.Xml.xml_element() | nil}
+          {:found, String.t(), [Ootempl.Xml.xml_element()], [Ootempl.Xml.xml_node()], Ootempl.Xml.xml_element() | nil}
           | {:no_placeholder, Ootempl.Xml.xml_node(), [Ootempl.Xml.xml_node()]}
   defp find_placeholder_span(nodes), do: scan_for_placeholder(nodes, "", [], [])
 
@@ -143,8 +143,7 @@ defmodule Ootempl.Xml.Normalizer do
           [Ootempl.Xml.xml_element()],
           [Ootempl.Xml.xml_element() | nil]
         ) ::
-          {:found, String.t(), [Ootempl.Xml.xml_element()], [Ootempl.Xml.xml_node()],
-           Ootempl.Xml.xml_element() | nil}
+          {:found, String.t(), [Ootempl.Xml.xml_element()], [Ootempl.Xml.xml_node()], Ootempl.Xml.xml_element() | nil}
           | {:no_placeholder, Ootempl.Xml.xml_node(), [Ootempl.Xml.xml_node()]}
   defp scan_for_placeholder([], _accumulated_text, span_runs, _properties) do
     # Reached end without finding complete placeholder
@@ -221,6 +220,7 @@ defmodule Ootempl.Xml.Normalizer do
     frequency_map =
       Enum.reduce(properties, %{}, fn props, acc ->
         key = serialize_props(props)
+
         Map.update(acc, key, {props, 1}, fn {existing_props, count} ->
           {existing_props, count + 1}
         end)
@@ -341,5 +341,4 @@ defmodule Ootempl.Xml.Normalizer do
       namespace: xmlNamespace(nodes: [{~c"w", ~c"http://schemas.openxmlformats.org/wordprocessingml/2006/main"}])
     )
   end
-
 end

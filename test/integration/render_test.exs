@@ -25,10 +25,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "replaces simple placeholders with data values" do
       # Arrange
       template_path = @test_fixture
+
       data = %{
         "person" => %{"first_name" => "Marty McFly"},
         "date" => "October 26, 1985"
       }
+
       output_path = @output_path
 
       # Act
@@ -52,10 +54,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "replaces nested data placeholders" do
       # Arrange
       template_path = @test_fixture
+
       data = %{
         "person" => %{"first_name" => "George McFly"},
         "date" => "November 5, 1955"
       }
+
       output_path = @output_path
 
       # Act
@@ -71,10 +75,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "converts numbers to strings during replacement" do
       # Arrange
       template_path = @test_fixture
+
       data = %{
         "person" => %{"first_name" => "88"},
         "date" => 1985
       }
+
       output_path = @output_path
 
       # Act
@@ -95,6 +101,7 @@ defmodule Ootempl.Integration.RenderTest do
         "PERSON" => %{"FIRST_NAME" => "Biff Tannen"},
         "Date" => "November 12, 1955"
       }
+
       output_path = @output_path
 
       # Act
@@ -110,7 +117,8 @@ defmodule Ootempl.Integration.RenderTest do
     test "returns error when placeholder data is missing" do
       # Arrange
       template_path = @test_fixture
-      data = %{} # Empty data, placeholders exist in template
+      # Empty data, placeholders exist in template
+      data = %{}
 
       # Act
       result = Ootempl.render(template_path, data, @output_path)
@@ -131,7 +139,8 @@ defmodule Ootempl.Integration.RenderTest do
     test "collects all placeholder errors together" do
       # Arrange
       template_path = @test_fixture
-      data = %{"date" => "1985"} # Only one field, template needs 2
+      # Only one field, template needs 2
+      data = %{"date" => "1985"}
 
       # Act
       result = Ootempl.render(template_path, data, @output_path)
@@ -146,10 +155,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "escapes XML special characters in replacement values" do
       # Arrange
       template_path = @test_fixture
+
       data = %{
         "person" => %{"first_name" => "Doc & Marty"},
         "date" => "<Back to the Future>"
       }
+
       output_path = @output_path
 
       # Act
@@ -164,9 +175,12 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Values should be escaped (double-escaped in serialized XML)
       # Our code escapes once, then xmerl escapes again during serialization
-      assert output_xml =~ "&amp;amp;"  # & -> &amp; -> &amp;amp;
-      assert output_xml =~ "&amp;lt;"   # < -> &lt; -> &amp;lt;
-      assert output_xml =~ "&amp;gt;"   # > -> &gt; -> &amp;gt;
+      # & -> &amp; -> &amp;amp;
+      assert output_xml =~ "&amp;amp;"
+      # < -> &lt; -> &amp;lt;
+      assert output_xml =~ "&amp;lt;"
+      # > -> &gt; -> &amp;gt;
+      assert output_xml =~ "&amp;gt;"
     end
   end
 
@@ -174,10 +188,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "renders real .docx template and produces valid output" do
       # Arrange
       template_path = @test_fixture
+
       data = %{
         "person" => %{"first_name" => "Test User"},
         "date" => "2025-10-06"
       }
+
       output_path = @output_path
 
       # Act
@@ -385,6 +401,7 @@ defmodule Ootempl.Integration.RenderTest do
     test "processes simple table template with list data" do
       # Arrange
       template_path = "test/fixtures/table_simple.docx"
+
       data = %{
         "title" => "Claims Report",
         "claims" => [
@@ -393,6 +410,7 @@ defmodule Ootempl.Integration.RenderTest do
         ],
         "total" => "350.50"
       }
+
       output_path = "test/fixtures/table_simple_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -421,11 +439,13 @@ defmodule Ootempl.Integration.RenderTest do
     test "handles empty list by removing template row" do
       # Arrange
       template_path = "test/fixtures/table_simple.docx"
+
       data = %{
         "title" => "Empty Report",
         "claims" => [],
         "total" => "0.00"
       }
+
       output_path = "test/fixtures/table_empty_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -447,6 +467,7 @@ defmodule Ootempl.Integration.RenderTest do
     test "processes mixed table with header, template, and footer rows" do
       # Arrange
       template_path = "test/fixtures/table_mixed.docx"
+
       data = %{
         "claims" => [
           %{"id" => "101", "amount" => "50.00"},
@@ -454,6 +475,7 @@ defmodule Ootempl.Integration.RenderTest do
         ],
         "total" => "125.00"
       }
+
       output_path = "test/fixtures/table_mixed_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -473,12 +495,14 @@ defmodule Ootempl.Integration.RenderTest do
     test "processes multi-row template" do
       # Arrange
       template_path = "test/fixtures/table_multirow.docx"
+
       data = %{
         "orders" => [
           %{"id" => "100", "product" => "Widget", "qty" => "5", "price" => "10.00"},
           %{"id" => "101", "product" => "Gadget", "qty" => "3", "price" => "25.00"}
         ]
       }
+
       output_path = "test/fixtures/table_multirow_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -499,6 +523,7 @@ defmodule Ootempl.Integration.RenderTest do
     test "processes multiple tables in same document" do
       # Arrange
       template_path = "test/fixtures/table_multiple.docx"
+
       data = %{
         "claims" => [
           %{"id" => "1", "amount" => "100"}
@@ -507,6 +532,7 @@ defmodule Ootempl.Integration.RenderTest do
           %{"id" => "A", "total" => "200"}
         ]
       }
+
       output_path = "test/fixtures/table_multiple_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -527,6 +553,7 @@ defmodule Ootempl.Integration.RenderTest do
     test "combines table processing with regular variable replacement" do
       # Arrange
       template_path = "test/fixtures/table_with_variables.docx"
+
       data = %{
         "company_name" => "Acme Corp",
         "report_date" => "2025-10-06",
@@ -534,6 +561,7 @@ defmodule Ootempl.Integration.RenderTest do
           %{"name" => "Product A", "price" => "50.00"}
         ]
       }
+
       output_path = "test/fixtures/table_with_variables_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -555,12 +583,14 @@ defmodule Ootempl.Integration.RenderTest do
     test "table output is valid .docx that can be opened in Word" do
       # Arrange
       template_path = "test/fixtures/table_from_word.docx"
+
       data = %{
         "claims" => [
           %{"id" => "999", "amount" => "999.99"}
         ],
         "total" => "999.99"
       }
+
       output_path = "test/fixtures/table_from_word_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -577,10 +607,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "handles table without templates (regular variable replacement only)" do
       # Arrange - table with no list placeholders, just regular variables
       template_path = "test/fixtures/table_no_template.docx"
+
       data = %{
         "name" => "John",
         "total" => "100"
       }
+
       output_path = "test/fixtures/table_no_template_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -601,10 +633,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "processes documents without headers or footers successfully" do
       # Arrange - existing fixture has no headers/footers
       template_path = @test_fixture
+
       data = %{
         "person" => %{"first_name" => "Doc Brown"},
         "date" => "November 5, 1955"
       }
+
       output_path = @output_path
 
       # Act
@@ -618,12 +652,14 @@ defmodule Ootempl.Integration.RenderTest do
     test "replaces placeholders in document headers" do
       # Arrange
       template_path = "test/fixtures/with_header_footer.docx"
+
       data = %{
         "company_name" => "Acme Corp",
         "footer_text" => "Confidential",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/header_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -643,12 +679,14 @@ defmodule Ootempl.Integration.RenderTest do
     test "replaces placeholders in document footers" do
       # Arrange
       template_path = "test/fixtures/with_header_footer.docx"
+
       data = %{
         "company_name" => "Test Inc",
         "footer_text" => "Confidential",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/footer_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -668,11 +706,13 @@ defmodule Ootempl.Integration.RenderTest do
     test "processes multiple header files (first page, odd/even)" do
       # Arrange
       template_path = "test/fixtures/multiple_headers.docx"
+
       data = %{
         "title" => "Document Title",
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/multiple_headers_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -694,10 +734,12 @@ defmodule Ootempl.Integration.RenderTest do
     test "reports placeholder errors from headers and footers" do
       # Arrange - header has @company_name@, footer has @footer_text@
       template_path = "test/fixtures/with_header_footer.docx"
+
       data = %{
         "person" => %{"first_name" => "Test"},
         "date" => "2025"
       }
+
       output_path = "test/fixtures/header_error_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
@@ -719,6 +761,7 @@ defmodule Ootempl.Integration.RenderTest do
       # Arrange
       template_path = @test_fixture
       output_path = "test/fixtures/manual_verification.docx"
+
       data = %{
         "person" => %{"first_name" => "Marty McFly"},
         "date" => "October 26, 1985"
