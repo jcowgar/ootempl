@@ -968,6 +968,7 @@ defmodule Ootempl.ImageTest do
       # Arrange
       # Create a deeply nested structure to test traversal
       text_node = xmlText(value: ~c"some text")
+
       doc_pr =
         xmlElement(
           name: :"wp:docPr",
@@ -1435,12 +1436,18 @@ defmodule Ootempl.ImageTest do
 
       # Assert
       xmlElement(content: content) = result
-      default_elements = Enum.filter(content, fn
-        xmlElement(name: :Default) -> true
-        xmlElement(name: name) ->
-          name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
-        _ -> false
-      end)
+
+      default_elements =
+        Enum.filter(content, fn
+          xmlElement(name: :Default) ->
+            true
+
+          xmlElement(name: name) ->
+            name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
+
+          _ ->
+            false
+        end)
 
       assert length(default_elements) == 2
     end
@@ -1461,12 +1468,18 @@ defmodule Ootempl.ImageTest do
 
       # Assert
       xmlElement(content: content) = result
-      default_elements = Enum.filter(content, fn
-        xmlElement(name: :Default) -> true
-        xmlElement(name: name) ->
-          name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
-        _ -> false
-      end)
+
+      default_elements =
+        Enum.filter(content, fn
+          xmlElement(name: :Default) ->
+            true
+
+          xmlElement(name: name) ->
+            name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
+
+          _ ->
+            false
+        end)
 
       assert length(default_elements) == 1
     end
@@ -1490,12 +1503,18 @@ defmodule Ootempl.ImageTest do
 
       # Assert
       xmlElement(content: content) = result
-      default_elements = Enum.filter(content, fn
-        xmlElement(name: :Default) -> true
-        xmlElement(name: name) ->
-          name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
-        _ -> false
-      end)
+
+      default_elements =
+        Enum.filter(content, fn
+          xmlElement(name: :Default) ->
+            true
+
+          xmlElement(name: name) ->
+            name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
+
+          _ ->
+            false
+        end)
 
       assert length(default_elements) == 3
     end

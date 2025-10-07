@@ -244,7 +244,7 @@ defmodule Ootempl.RelationshipsTest do
       # Assert - Should generate rId6 (max numeric is 5)
       assert new_id == "rId6"
       # Verify no collision with any existing ID
-      assert new_id not in existing_ids
+      refute new_id in existing_ids
     end
 
     test "handles malformed IDs without crashing" do
@@ -256,7 +256,7 @@ defmodule Ootempl.RelationshipsTest do
 
       # Assert - Should generate based on max valid numeric ID (rId1 -> 1)
       assert new_id == "rId2"
-      assert new_id not in existing_ids
+      refute new_id in existing_ids
     end
 
     test "avoids collision with non-numeric ID that looks like next numeric ID" do
@@ -268,7 +268,7 @@ defmodule Ootempl.RelationshipsTest do
 
       # Assert - Should generate rId6, not rId2 (which already exists)
       assert new_id == "rId6"
-      assert new_id not in existing_ids
+      refute new_id in existing_ids
     end
 
     test "handles all non-numeric IDs" do
@@ -280,7 +280,7 @@ defmodule Ootempl.RelationshipsTest do
 
       # Assert - Should start from rId1
       assert new_id == "rId1"
-      assert new_id not in existing_ids
+      refute new_id in existing_ids
     end
 
     test "handles empty string after rId prefix" do
@@ -414,9 +414,10 @@ defmodule Ootempl.RelationshipsTest do
       rel2 = Relationships.create_image_relationship("rId2", "media/image2.png")
 
       # Act
-      updated = rels
-      |> Relationships.add_relationship(rel1)
-      |> Relationships.add_relationship(rel2)
+      updated =
+        rels
+        |> Relationships.add_relationship(rel1)
+        |> Relationships.add_relationship(rel2)
 
       # Assert
       ids = Relationships.extract_relationship_ids(updated)

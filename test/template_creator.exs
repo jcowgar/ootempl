@@ -102,7 +102,7 @@ defmodule TemplateCreator do
       {:ok, rels_content} = File.read(rels_path)
 
       # Add image relationship if not already present
-      unless String.contains?(rels_content, "rId5") do
+      if !String.contains?(rels_content, "rId5") do
         image_rel = """
           <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
         """
@@ -118,7 +118,7 @@ defmodule TemplateCreator do
     if File.exists?(content_types_path) do
       {:ok, types_content} = File.read(content_types_path)
 
-      unless String.contains?(types_content, "Extension=\"png\"") do
+      if !String.contains?(types_content, "Extension=\"png\"") do
         png_type = ~s(<Default Extension="png" ContentType="image/png"/>)
         modified_types = String.replace(types_content, "</Types>", "#{png_type}</Types>", global: false)
         File.write!(content_types_path, modified_types)
@@ -234,10 +234,12 @@ defmodule TemplateCreator do
 
     if File.exists?(rels_path) do
       {:ok, rels_content} = File.read(rels_path)
+
       image_rels = """
         <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
         <Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image2.jpg"/>
       """
+
       modified_rels = String.replace(rels_content, "</Relationships>", "#{image_rels}</Relationships>", global: false)
       File.write!(rels_path, modified_rels)
     end
@@ -330,7 +332,10 @@ defmodule TemplateCreator do
 
     if File.exists?(rels_path) do
       {:ok, rels_content} = File.read(rels_path)
-      image_rel = ~s(<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>)
+
+      image_rel =
+        ~s(<Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>)
+
       modified_rels = String.replace(rels_content, "</Relationships>", "#{image_rel}</Relationships>", global: false)
       File.write!(rels_path, modified_rels)
     end

@@ -357,6 +357,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
         """,
         "word/_rels/document.xml.rels" => document_rels_xml()
       }
+
       Ootempl.Archive.create(file_map, template_path)
 
       data = %{"name" => "Alice", "show_message" => false, "message" => "Secret"}

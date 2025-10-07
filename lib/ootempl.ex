@@ -38,6 +38,52 @@ defmodule Ootempl do
   #=> :ok
   ```
 
+  ### Struct Support
+
+  Elixir structs work seamlessly with `render/3`. You can pass structs directly
+  without converting them to maps first. Struct fields (atoms) are matched
+  case-insensitively to placeholders.
+
+  ```elixir
+  defmodule Customer do
+    defstruct [:name, :email, :address]
+  end
+
+  defmodule Address do
+    defstruct [:street, :city, :state, :zip]
+  end
+
+  # Use structs directly in your data
+  customer = %Customer{
+    name: "John Doe",
+    email: "john@example.com",
+    address: %Address{
+      city: "Boston",
+      state: "MA",
+      zip: "02101"
+    }
+  }
+
+  data = %{
+    "order_id" => "ORD-12345",
+    "customer" => customer
+  }
+
+  # Template can reference struct fields:
+  # - @customer.name@ → "John Doe"
+  # - @customer.email@ → "john@example.com"
+  # - @customer.address.city@ → "Boston"
+
+  Ootempl.render("invoice_template.docx", data, "invoice.docx")
+  #=> :ok
+  ```
+
+  Struct features:
+  - **Nested structs**: Access fields multiple levels deep
+  - **Case-insensitive**: `@customer.Name@` matches `:name` field
+  - **Mixed data**: Combine structs and maps in the same data structure
+  - **Lists of structs**: Use structs in table templates
+
   ### Table Templates
 
   Table templates automatically duplicate rows based on list data. Template rows are
@@ -388,7 +434,7 @@ defmodule Ootempl do
   - Nil values in data
   - Unsupported data types (maps, lists as values)
   """
-  @spec render(Path.t(), map(), Path.t()) :: :ok | {:error, term()}
+  @spec render(Path.t(), map() | struct(), Path.t()) :: :ok | {:error, term()}
   def render(template_path, data, output_path) do
     with :ok <- validate_paths(template_path, output_path),
          :ok <- Validator.validate_docx(template_path) do
@@ -747,6 +793,7 @@ defmodule Ootempl do
   @spec find_body_element(Xml.xml_element()) :: Xml.xml_element()
   defp find_body_element(xml_doc) do
     import Xml
+
     require Record
 
     children = xmlElement(xml_doc, :content)
@@ -760,6 +807,7 @@ defmodule Ootempl do
   @spec extract_all_text_from_doc(Xml.xml_element()) :: String.t()
   defp extract_all_text_from_doc(element) do
     import Xml
+
     require Record
 
     children = xmlElement(element, :content)
@@ -1055,14 +1103,7 @@ defmodule Ootempl do
     {:ok, xml_doc, rels_xml, content_types_xml}
   end
 
-  defp process_each_placeholder(
-         xml_doc,
-         [placeholder | rest],
-         data,
-         temp_dir,
-         rels_xml,
-         content_types_xml
-       ) do
+  defp process_each_placeholder(xml_doc, [placeholder | rest], data, temp_dir, rels_xml, content_types_xml) do
     with {:ok, modified_doc, updated_rels, updated_types} <-
            process_single_image_placeholder(
              xml_doc,
@@ -1085,14 +1126,7 @@ defmodule Ootempl do
           Xml.xml_element(),
           tuple()
         ) :: {:ok, Xml.xml_element(), Xml.xml_element(), tuple()} | {:error, term()}
-  defp process_single_image_placeholder(
-         xml_doc,
-         placeholder,
-         data,
-         temp_dir,
-         rels_xml,
-         content_types_xml
-       ) do
+  defp process_single_image_placeholder(xml_doc, placeholder, data, temp_dir, rels_xml, content_types_xml) do
     # Get image path from data
     image_path = Map.get(data, placeholder.placeholder_name)
 
@@ -1108,25 +1142,28 @@ defmodule Ootempl do
            {:ok, image_dims} <- Image.get_image_dimensions(image_path),
            {scaled_width, scaled_height} <-
              Image.calculate_scaled_dimensions(image_dims, placeholder.template_dimensions),
-           extension <- Path.extname(image_path),
-           existing_ids <- Relationships.extract_relationship_ids(rels_xml),
-           new_rel_id <- Relationships.generate_unique_id(existing_ids),
-           existing_media_files <- list_existing_media_files(temp_dir),
-           media_filename <- Image.generate_media_filename(existing_media_files, extension),
-           :ok <- embed_image_to_media(temp_dir, image_path, media_filename),
-           relationship <-
-             Relationships.create_image_relationship(new_rel_id, "media/#{media_filename}"),
-           updated_rels <- Relationships.add_relationship(rels_xml, relationship),
-           mime_type <- Image.mime_type_for_extension(extension),
-           updated_types <- add_image_content_type(content_types_xml, extension, mime_type),
-           modified_doc <-
-             update_image_reference(
-               xml_doc,
-               placeholder,
-               new_rel_id,
-               scaled_width,
-               scaled_height
-             ) do
+           extension = Path.extname(image_path),
+           existing_ids = Relationships.extract_relationship_ids(rels_xml),
+           new_rel_id = Relationships.generate_unique_id(existing_ids),
+           existing_media_files = list_existing_media_files(temp_dir),
+           media_filename = Image.generate_media_filename(existing_media_files, extension),
+           :ok <- embed_image_to_media(temp_dir, image_path, media_filename) do
+        relationship =
+          Relationships.create_image_relationship(new_rel_id, "media/#{media_filename}")
+
+        updated_rels = Relationships.add_relationship(rels_xml, relationship)
+        mime_type = Image.mime_type_for_extension(extension)
+        updated_types = add_image_content_type(content_types_xml, extension, mime_type)
+
+        modified_doc =
+          update_image_reference(
+            xml_doc,
+            placeholder,
+            new_rel_id,
+            scaled_width,
+            scaled_height
+          )
+
         {:ok, modified_doc, updated_rels, updated_types}
       else
         {:error, atom} when is_atom(atom) ->
