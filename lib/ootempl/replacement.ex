@@ -113,35 +113,9 @@ defmodule Ootempl.Replacement do
     end
   end
 
-  @doc """
-  Replaces placeholders in a single text node with values from the data map.
-
-  Detects all placeholders in the text node's value, looks up their values in the
-  data map, and replaces them with XML-escaped values.
-
-  ## Parameters
-
-    - `text_node` - The XML text node to process
-    - `data` - Map containing replacement values
-
-  ## Returns
-
-    - `{:ok, modified_text_node, []}` - Modified text node with no errors
-    - `{:ok, original_text_node, errors}` - Original text node with list of error tuples
-
-  ## Examples
-
-      Replacing placeholders in a text node:
-
-          import Ootempl.Xml
-          {:ok, doc} = Ootempl.Xml.parse("<w:t>Hello @name@</w:t>")
-          [text_node] = xmlElement(doc, :content)
-          {:ok, result, []} = Ootempl.Replacement.replace_in_text_node(text_node, %{"name" => "World"})
-          # result contains modified text node with "Hello World"
-  """
   @spec replace_in_text_node(xml_text(), map()) ::
           {:ok, xml_text(), [{String.t(), DataAccess.error_reason()}]}
-  def replace_in_text_node(text_node, data) do
+  defp replace_in_text_node(text_node, data) do
     text = text_node |> xmlText(:value) |> List.to_string()
     placeholders = Placeholder.detect(text)
 
@@ -173,33 +147,8 @@ defmodule Ootempl.Replacement do
     end
   end
 
-  @doc """
-  Escapes special XML characters in a string.
-
-  Converts characters that have special meaning in XML to their entity equivalents
-  to prevent XML corruption when values are inserted into the document.
-
-  ## Parameters
-
-    - `value` - The string to escape
-
-  ## Returns
-
-    - XML-escaped string
-
-  ## Examples
-
-      iex> Ootempl.Replacement.xml_escape("Hello & goodbye")
-      "Hello &amp; goodbye"
-
-      iex> Ootempl.Replacement.xml_escape("<tag>")
-      "&lt;tag&gt;"
-
-      iex> Ootempl.Replacement.xml_escape("It's \\"quoted\\"")
-      "It&apos;s &quot;quoted&quot;"
-  """
   @spec xml_escape(String.t()) :: String.t()
-  def xml_escape(value) when is_binary(value) do
+  defp xml_escape(value) when is_binary(value) do
     value
     |> String.replace("&", "&amp;")
     |> String.replace("<", "&lt;")

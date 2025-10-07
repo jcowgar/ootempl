@@ -72,32 +72,8 @@ defmodule Ootempl.Conditional do
     Enum.sort_by(if_markers ++ endif_markers, & &1.position)
   end
 
-  @doc """
-  Parses a condition string to extract the variable path.
-
-  Supports dot notation for nested data paths.
-
-  ## Parameters
-
-  - `condition` - The condition variable string (e.g., "customer.active")
-
-  ## Returns
-
-  A list of path segments.
-
-  ## Examples
-
-      iex> Ootempl.Conditional.parse_condition("active")
-      ["active"]
-
-      iex> Ootempl.Conditional.parse_condition("customer.active")
-      ["customer", "active"]
-
-      iex> Ootempl.Conditional.parse_condition("user.profile.name")
-      ["user", "profile", "name"]
-  """
   @spec parse_condition(String.t()) :: [String.t()]
-  def parse_condition(condition) when is_binary(condition) do
+  defp parse_condition(condition) when is_binary(condition) do
     String.split(condition, ".")
   end
 
@@ -138,62 +114,6 @@ defmodule Ootempl.Conditional do
     validate_pairs_recursive(conditionals, [])
   end
 
-  @doc """
-  Evaluates whether a value is truthy according to conditional logic rules.
-
-  Values considered falsy:
-  - `nil`
-  - `false`
-  - Empty string `""`
-  - Integer `0`
-  - Float `0.0`
-
-  All other values are considered truthy.
-
-  ## Parameters
-
-  - `value` - The value to evaluate
-
-  ## Returns
-
-  Boolean indicating if the value is truthy.
-
-  ## Examples
-
-      iex> Ootempl.Conditional.truthy?(true)
-      true
-
-      iex> Ootempl.Conditional.truthy?(false)
-      false
-
-      iex> Ootempl.Conditional.truthy?(nil)
-      false
-
-      iex> Ootempl.Conditional.truthy?("")
-      false
-
-      iex> Ootempl.Conditional.truthy?(0)
-      false
-
-      iex> Ootempl.Conditional.truthy?(0.0)
-      false
-
-      iex> Ootempl.Conditional.truthy?("hello")
-      true
-
-      iex> Ootempl.Conditional.truthy?(1)
-      true
-
-      iex> Ootempl.Conditional.truthy?([])
-      true
-  """
-  @spec truthy?(term()) :: boolean()
-  def truthy?(nil), do: false
-  def truthy?(false), do: false
-  def truthy?(""), do: false
-  def truthy?(0), do: false
-  def truthy?(value) when is_float(value) and value == 0.0, do: false
-  def truthy?(_), do: true
 
   @doc """
   Evaluates a conditional expression by checking if the data path resolves to a truthy value.

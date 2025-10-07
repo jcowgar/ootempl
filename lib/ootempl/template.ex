@@ -118,11 +118,8 @@ defmodule Ootempl.Template do
     end
   end
 
-  @doc """
-  Clones an XML node (element or text).
-  """
   @spec clone_xml_node(Xml.xml_node()) :: Xml.xml_node()
-  def clone_xml_node(node) do
+  defp clone_xml_node(node) do
     import Xml
 
     require Record

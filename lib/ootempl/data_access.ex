@@ -89,48 +89,13 @@ defmodule Ootempl.DataAccess do
     end
   end
 
-  @doc """
-  Converts a value to its string representation.
-
-  Handles strings, numbers, booleans, and returns errors for nil and unsupported types.
-
-  ## Parameters
-
-    - `value` - The value to convert
-
-  ## Returns
-
-    - `{:ok, string}` - The value as a string
-    - `{:error, :nil_value}` - When value is nil
-    - `{:error, :unsupported_type}` - When value type cannot be converted
-
-  ## Examples
-
-      iex> Ootempl.DataAccess.to_string_value("hello")
-      {:ok, "hello"}
-
-      iex> Ootempl.DataAccess.to_string_value(42)
-      {:ok, "42"}
-
-      iex> Ootempl.DataAccess.to_string_value(true)
-      {:ok, "true"}
-
-      iex> Ootempl.DataAccess.to_string_value(false)
-      {:ok, "false"}
-
-      iex> Ootempl.DataAccess.to_string_value(nil)
-      {:error, :nil_value}
-
-      iex> Ootempl.DataAccess.to_string_value(%{})
-      {:error, :unsupported_type}
-  """
   @spec to_string_value(term()) :: {:ok, String.t()} | {:error, :nil_value | :unsupported_type}
-  def to_string_value(value) when is_binary(value), do: {:ok, value}
-  def to_string_value(value) when is_number(value), do: {:ok, to_string(value)}
-  def to_string_value(true), do: {:ok, "true"}
-  def to_string_value(false), do: {:ok, "false"}
-  def to_string_value(nil), do: {:error, :nil_value}
-  def to_string_value(_), do: {:error, :unsupported_type}
+  defp to_string_value(value) when is_binary(value), do: {:ok, value}
+  defp to_string_value(value) when is_number(value), do: {:ok, to_string(value)}
+  defp to_string_value(true), do: {:ok, "true"}
+  defp to_string_value(false), do: {:ok, "false"}
+  defp to_string_value(nil), do: {:error, :nil_value}
+  defp to_string_value(_), do: {:error, :unsupported_type}
 
   # Private functions
 
@@ -168,55 +133,13 @@ defmodule Ootempl.DataAccess do
     {:error, {:path_not_found, original_path}}
   end
 
-  @doc """
-  Finds the matching key in a case-insensitive manner.
-
-  Supports both string and atom keys. Atom keys are converted to strings for matching.
-  If both an atom and string version of the same key exist (e.g., `:name` and `"name"`),
-  an error is returned.
-
-  ## Parameters
-
-    - `lookup_key` - The key to search for (case-insensitive)
-    - `available_keys` - List of available keys to search through (strings or atoms)
-
-  ## Returns
-
-    - `{:ok, key}` - The matched key (in its original form: string or atom)
-    - `{:error, {:path_not_found, [lookup_key]}}` - No matching key found
-    - `{:error, {:ambiguous_key, lookup_key, matches}}` - Multiple case variants found (sorted)
-    - `{:error, {:conflicting_key_types, lookup_key, atom_key, string_key}}` - Both atom and string versions exist
-
-  ## Examples
-
-      iex> Ootempl.DataAccess.normalize_key("name", ["name", "age"])
-      {:ok, "name"}
-
-      iex> Ootempl.DataAccess.normalize_key("Name", ["name", "age"])
-      {:ok, "name"}
-
-      iex> Ootempl.DataAccess.normalize_key("name", [:name, :age])
-      {:ok, :name}
-
-      iex> Ootempl.DataAccess.normalize_key("NAME", [:name, :age])
-      {:ok, :name}
-
-      iex> Ootempl.DataAccess.normalize_key("missing", ["name", "age"])
-      {:error, {:path_not_found, ["missing"]}}
-
-      iex> Ootempl.DataAccess.normalize_key("name", ["name", "Name"])
-      {:error, {:ambiguous_key, "name", ["Name", "name"]}}
-
-      iex> Ootempl.DataAccess.normalize_key("name", [:name, "name"])
-      {:error, {:conflicting_key_types, "name", :name, "name"}}
-  """
   @spec normalize_key(String.t(), [String.t() | atom()]) ::
           {:ok, String.t() | atom()}
           | {:error,
              {:path_not_found, [String.t()]}
              | {:ambiguous_key, String.t(), [String.t() | atom()]}
              | {:conflicting_key_types, String.t(), atom(), String.t()}}
-  def normalize_key(lookup_key, available_keys) when is_binary(lookup_key) and is_list(available_keys) do
+  defp normalize_key(lookup_key, available_keys) when is_binary(lookup_key) and is_list(available_keys) do
     lowercase_lookup = String.downcase(lookup_key)
     {atom_matches, string_matches} = find_matches(available_keys, lowercase_lookup)
     resolve_key_match(lookup_key, atom_matches, string_matches)

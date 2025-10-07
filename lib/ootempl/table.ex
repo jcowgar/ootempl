@@ -104,43 +104,9 @@ defmodule Ootempl.Table do
     find_elements_recursive(table_element, :"w:tr")
   end
 
-  @doc """
-  Analyzes a table row to determine if it's a template row.
-
-  Examines all placeholders in the row's cells and checks if any reference list data.
-  A row is a template row if it contains placeholders that reference a list in the
-  data structure.
-
-  ## Parameters
-
-    - `row_element` - The row XML element to analyze
-    - `data` - The data structure to check against
-
-  ## Returns
-
-    - `{:ok, analysis}` - Row analysis with template status and list reference
-    - `{:error, :multiple_lists}` - Row references multiple different lists (conflict)
-
-  ## Examples
-
-      # Regular row (no list reference)
-      data = %{"name" => "John"}
-      Ootempl.Table.analyze_row(row, data)
-      # => {:ok, %{row: row, template?: false, list_key: nil, placeholders: [...]}}
-
-      # Template row (references list)
-      data = %{"claims" => [%{"id" => 1}]}
-      Ootempl.Table.analyze_row(row_with_claims, data)
-      # => {:ok, %{row: row, template?: true, list_key: "claims", placeholders: [...]}}
-
-      # Conflict (multiple lists)
-      data = %{"claims" => [...], "orders" => [...]}
-      Ootempl.Table.analyze_row(row_with_both, data)
-      # => {:error, :multiple_lists}
-  """
   @spec analyze_row(Ootempl.Xml.xml_element(), map()) ::
           {:ok, row_analysis()} | {:error, :multiple_lists}
-  def analyze_row(row_element, data) do
+  defp analyze_row(row_element, data) do
     # Extract all text from row cells
     text = extract_row_text(row_element)
 
@@ -229,39 +195,8 @@ defmodule Ootempl.Table do
     end
   end
 
-  @doc """
-  Checks if a data key references a list.
-
-  Looks up the key in the data structure and determines if the value is a list.
-
-  ## Parameters
-
-    - `key` - The data key to check (first segment of placeholder path)
-    - `data` - The data structure to check
-
-  ## Returns
-
-    - `true` if the key exists and its value is a list
-    - `false` otherwise
-
-  ## Examples
-
-      data = %{
-        "name" => "John",
-        "claims" => [%{"id" => 1}, %{"id" => 2}]
-      }
-
-      Ootempl.Table.list_reference?("name", data)
-      # => false
-
-      Ootempl.Table.list_reference?("claims", data)
-      # => true
-
-      Ootempl.Table.list_reference?("unknown", data)
-      # => false
-  """
   @spec list_reference?(String.t(), map()) :: boolean()
-  def list_reference?(key, data) when is_binary(key) and is_map(data) do
+  defp list_reference?(key, data) when is_binary(key) and is_map(data) do
     case Map.get(data, key) do
       value when is_list(value) -> true
       _ -> false

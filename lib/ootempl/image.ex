@@ -66,30 +66,8 @@ defmodule Ootempl.Image do
     |> Enum.reject(&is_nil/1)
   end
 
-  @doc """
-  Parses an image marker from alt text.
-
-  Extracts the placeholder name from alt text in the format `@image:name@`.
-
-  ## Parameters
-
-    - `alt_text` - The alt text string to parse
-
-  ## Returns
-
-  - `{:ok, name}` if the alt text matches the image marker pattern
-  - `:error` if the alt text does not match
-
-  ## Examples
-
-      iex> Ootempl.Image.parse_image_marker("@image:logo@")
-      {:ok, "logo"}
-
-      iex> Ootempl.Image.parse_image_marker("Regular alt text")
-      :error
-  """
   @spec parse_image_marker(String.t()) :: {:ok, String.t()} | :error
-  def parse_image_marker(alt_text) when is_binary(alt_text) do
+  defp parse_image_marker(alt_text) when is_binary(alt_text) do
     case Regex.run(@image_marker_regex, alt_text) do
       [_, name] -> {:ok, name}
       _ -> :error
