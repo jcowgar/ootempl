@@ -143,8 +143,7 @@ defmodule Ootempl.Relationships do
       }
   """
   @spec create_image_relationship(String.t(), String.t()) :: relationship()
-  def create_image_relationship(id, target)
-      when is_binary(id) and is_binary(target) do
+  def create_image_relationship(id, target) when is_binary(id) and is_binary(target) do
     %{
       id: id,
       type: @image_relationship_type,

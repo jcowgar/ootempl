@@ -441,4 +441,280 @@ defmodule OotemplTest do
       end
     end
   end
+
+  describe "render/3 with struct data" do
+    defmodule Customer do
+      @moduledoc false
+      defstruct [:name, :email, :address]
+    end
+
+    defmodule Address do
+      @moduledoc false
+      defstruct [:street, :city, :state, :zip]
+    end
+
+    test "renders template with simple struct data" do
+      # Arrange
+      # Template has @person.first_name@ and @date@ - we need struct fields that match
+      # Create custom data structure that matches the template with atom keys (like a struct)
+      data = %{person: %{first_name: "Struct User"}, date: "2025-10-07"}
+
+      template_path = @test_fixture
+      output_path = "test/fixtures/output_struct_test.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      assert File.exists?(output_path)
+
+      # Verify placeholder replacement worked with struct field (atom key)
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Struct User"
+      assert output_xml =~ "2025-10-07"
+    end
+
+    test "renders template with nested struct data" do
+      # Arrange
+      customer = %Customer{
+        name: "Bob Smith",
+        email: "bob@example.com",
+        address: %Address{
+          street: "123 Main St",
+          city: "Boston",
+          state: "MA",
+          zip: "02101"
+        }
+      }
+
+      # Create a template that uses nested struct paths
+      template_path = "test/fixtures/nested_struct_template.docx"
+      output_path = "test/fixtures/output_nested_struct.docx"
+
+      # Create template with nested placeholders like @customer.name@, @customer.address.city@
+      file_map = %{
+        "word/document.xml" => """
+        <?xml version="1.0"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:r><w:t>Customer: @customer.name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Email: @customer.email@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>City: @customer.address.city@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>State: @customer.address.state@</w:t></w:r></w:p>
+          </w:body>
+        </w:document>
+        """,
+        "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+        "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+      }
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn ->
+        File.rm(template_path)
+        File.rm(output_path)
+      end)
+
+      data = %{customer: customer}
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Bob Smith"
+      assert output_xml =~ "bob@example.com"
+      assert output_xml =~ "Boston"
+      assert output_xml =~ "MA"
+    end
+
+    test "renders template with case-insensitive struct field matching" do
+      # Arrange
+      customer = %Customer{
+        name: "Alice Johnson",
+        email: "alice@example.com",
+        address: nil
+      }
+
+      template_path = "test/fixtures/case_insensitive_struct.docx"
+      output_path = "test/fixtures/output_case_insensitive.docx"
+
+      # Create template with different case variations
+      file_map = %{
+        "word/document.xml" => """
+        <?xml version="1.0"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:r><w:t>Name: @customer.Name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Email: @customer.EMAIL@</w:t></w:r></w:p>
+          </w:body>
+        </w:document>
+        """,
+        "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+        "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+      }
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn ->
+        File.rm(template_path)
+        File.rm(output_path)
+      end)
+
+      data = %{customer: customer}
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Alice Johnson"
+      assert output_xml =~ "alice@example.com"
+    end
+
+    test "renders template with list of structs" do
+      # Arrange
+      customers = [
+        %Customer{name: "Customer 1", email: "c1@example.com", address: nil},
+        %Customer{name: "Customer 2", email: "c2@example.com", address: nil}
+      ]
+
+      template_path = "test/fixtures/struct_list_template.docx"
+      output_path = "test/fixtures/output_struct_list.docx"
+
+      # Create template that accesses list items
+      file_map = %{
+        "word/document.xml" => """
+        <?xml version="1.0"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:r><w:t>First: @customers.0.name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Second: @customers.1.name@</w:t></w:r></w:p>
+          </w:body>
+        </w:document>
+        """,
+        "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+        "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+      }
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn ->
+        File.rm(template_path)
+        File.rm(output_path)
+      end)
+
+      data = %{customers: customers}
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Customer 1"
+      assert output_xml =~ "Customer 2"
+    end
+
+    test "renders template with struct containing nil field" do
+      # Arrange
+      customer = %Customer{
+        name: "No Address User",
+        email: "noaddr@example.com",
+        address: nil
+      }
+
+      template_path = "test/fixtures/nil_field_template.docx"
+      output_path = "test/fixtures/output_nil_field.docx"
+
+      # Create template that tries to access nil field
+      file_map = %{
+        "word/document.xml" => """
+        <?xml version="1.0"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:r><w:t>Name: @customer.name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Address: @customer.address@</w:t></w:r></w:p>
+          </w:body>
+        </w:document>
+        """,
+        "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+        "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+      }
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn ->
+        File.rm(template_path)
+        File.rm(output_path)
+      end)
+
+      data = %{customer: customer}
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert - nil values cause placeholder errors
+      # Based on DataAccess behavior, nil returns {:error, :nil_value}
+      assert {:error, %Ootempl.PlaceholderError{}} = result
+      refute File.exists?(output_path)
+    end
+
+    test "renders template with mixed struct and map data" do
+      # Arrange
+      customer = %Customer{
+        name: "Mixed Data User",
+        email: "mixed@example.com",
+        address: nil
+      }
+
+      template_path = "test/fixtures/mixed_data_template.docx"
+      output_path = "test/fixtures/output_mixed_data.docx"
+
+      # Create template
+      file_map = %{
+        "word/document.xml" => """
+        <?xml version="1.0"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:r><w:t>Customer: @customer.name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Order ID: @order_id@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Status: @metadata.status@</w:t></w:r></w:p>
+          </w:body>
+        </w:document>
+        """,
+        "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+        "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+      }
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn ->
+        File.rm(template_path)
+        File.rm(output_path)
+      end)
+
+      # Mix struct and plain map data
+      data = %{
+        customer: customer,
+        order_id: "ORD-12345",
+        metadata: %{"status" => "shipped"}
+      }
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      assert output_xml =~ "Mixed Data User"
+      assert output_xml =~ "ORD-12345"
+      assert output_xml =~ "shipped"
+    end
+  end
 end

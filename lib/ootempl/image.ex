@@ -209,7 +209,8 @@ defmodule Ootempl.Image do
          {:ok, files} <- tag_error(:zip.unzip(to_charlist(archive_path), [:memory]), :unzip_archive),
          media_path = to_charlist("word/media/#{media_filename}"),
          updated_files = [{media_path, image_data} | files],
-         {:ok, {_filename, zip_data}} <- tag_error(:zip.zip(to_charlist(archive_path), updated_files, [:memory]), :rezip_archive) do
+         {:ok, {_filename, zip_data}} <-
+           tag_error(:zip.zip(to_charlist(archive_path), updated_files, [:memory]), :rezip_archive) do
       tag_error(File.write(archive_path, zip_data), :write_archive)
     end
   end
@@ -240,8 +241,7 @@ defmodule Ootempl.Image do
   def generate_media_filename(existing_files, extension) when is_list(existing_files) and is_binary(extension) do
     # Extract numbers from existing image filenames
     numbers =
-      existing_files
-      |> Enum.map(fn filename ->
+      Enum.map(existing_files, fn filename ->
         case Regex.run(~r/image(\d+)\./, filename) do
           [_, num] -> String.to_integer(num)
           _ -> 0
@@ -276,8 +276,8 @@ defmodule Ootempl.Image do
   """
   @spec calculate_scaled_dimensions({number(), number()}, {number(), number()}) :: {float(), float()}
   def calculate_scaled_dimensions({src_width, src_height}, {template_width, template_height})
-      when is_number(src_width) and is_number(src_height) and
-             is_number(template_width) and is_number(template_height) do
+      when is_number(src_width) and is_number(src_height) and is_number(template_width) and
+             is_number(template_height) do
     width_scale = template_width / src_width
     height_scale = template_height / src_height
     scale = min(width_scale, height_scale)

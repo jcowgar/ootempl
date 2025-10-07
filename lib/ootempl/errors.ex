@@ -292,6 +292,7 @@ defmodule Ootempl.ImageError do
 
   defp build_message(placeholder_name, image_path, :unsupported_format) do
     extension = Path.extname(image_path)
+
     "Unsupported image format for placeholder '#{placeholder_name}': #{image_path} (format: #{extension}, only PNG, JPEG, GIF supported)"
   end
 

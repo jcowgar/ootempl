@@ -14,8 +14,6 @@ defmodule Ootempl.ImageReplacementTest do
 
   use ExUnit.Case, async: false
 
-  alias Ootempl
-
   @test_png_path "test/fixtures/images/test.png"
   @test_jpg_path "test/fixtures/images/test.jpg"
   @test_gif_path "test/fixtures/images/test.gif"
@@ -51,7 +49,7 @@ defmodule Ootempl.ImageReplacementTest do
 
       # Verify relationship was updated
       rels_file = Enum.find(files, fn {name, _} -> to_string(name) == "word/_rels/document.xml.rels" end)
-      assert rels_file != nil
+      assert rels_file
       {_, rels_content} = rels_file
       rels_str = to_string(rels_content)
       assert rels_str =~ "media/"
@@ -59,7 +57,7 @@ defmodule Ootempl.ImageReplacementTest do
 
       # Verify content type was added
       content_types_file = Enum.find(files, fn {name, _} -> to_string(name) == "[Content_Types].xml" end)
-      assert content_types_file != nil
+      assert content_types_file
       {_, types_content} = content_types_file
       types_str = to_string(types_content)
       assert types_str =~ "image/png"
@@ -229,9 +227,11 @@ defmodule Ootempl.ImageReplacementTest do
 
       # Verify both images were embedded
       {:ok, files} = :zip.unzip(String.to_charlist(output_path), [:memory])
-      media_files = Enum.filter(files, fn {name, _} ->
-        String.contains?(to_string(name), "word/media/")
-      end)
+
+      media_files =
+        Enum.filter(files, fn {name, _} ->
+          String.contains?(to_string(name), "word/media/")
+        end)
 
       # Should have at least 2 new media files
       assert length(media_files) >= 2
@@ -317,9 +317,11 @@ defmodule Ootempl.ImageReplacementTest do
       # Note: @image:company_logo@ appears in alt text (descr attribute), not in document text
 
       # Verify image was embedded
-      media_files = Enum.filter(files, fn {name, _} ->
-        String.contains?(to_string(name), "word/media/")
-      end)
+      media_files =
+        Enum.filter(files, fn {name, _} ->
+          String.contains?(to_string(name), "word/media/")
+        end)
+
       assert length(media_files) >= 1
 
       # Verify image was processed successfully (media files were added)
@@ -390,7 +392,7 @@ defmodule Ootempl.ImageReplacementTest do
       rels_str = to_string(rels_content)
 
       # Extract all relationship IDs
-      ids = Regex.scan(~r/Id="(rId\d+)"/, rels_str) |> Enum.map(fn [_, id] -> id end)
+      ids = ~r/Id="(rId\d+)"/ |> Regex.scan(rels_str) |> Enum.map(fn [_, id] -> id end)
 
       # Note: The template has rId5 and rId6, and our code may reuse them when replacing images
       # The important thing is that we have relationship entries for the images
@@ -422,9 +424,11 @@ defmodule Ootempl.ImageReplacementTest do
 
       # Verify media files have unique names
       {:ok, files} = :zip.unzip(String.to_charlist(output_path), [:memory])
-      media_files = Enum.filter(files, fn {name, _} ->
-        String.contains?(to_string(name), "word/media/")
-      end)
+
+      media_files =
+        Enum.filter(files, fn {name, _} ->
+          String.contains?(to_string(name), "word/media/")
+        end)
 
       media_names = Enum.map(media_files, fn {name, _} -> to_string(name) end)
       assert length(media_names) == length(Enum.uniq(media_names))
@@ -438,9 +442,12 @@ defmodule Ootempl.ImageReplacementTest do
 
       # First, extract and count relationships in template
       {:ok, template_files} = :zip.unzip(String.to_charlist(template_path), [:memory])
-      template_rels_file = Enum.find(template_files, fn {name, _} ->
-        to_string(name) == "word/_rels/document.xml.rels"
-      end)
+
+      template_rels_file =
+        Enum.find(template_files, fn {name, _} ->
+          to_string(name) == "word/_rels/document.xml.rels"
+        end)
+
       {_, template_rels_content} = template_rels_file
       template_rels_str = to_string(template_rels_content)
       template_rel_count = template_rels_str |> String.split("<Relationship ") |> length() |> Kernel.-(1)
@@ -461,9 +468,12 @@ defmodule Ootempl.ImageReplacementTest do
 
       # Count relationships in output
       {:ok, output_files} = :zip.unzip(String.to_charlist(output_path), [:memory])
-      output_rels_file = Enum.find(output_files, fn {name, _} ->
-        to_string(name) == "word/_rels/document.xml.rels"
-      end)
+
+      output_rels_file =
+        Enum.find(output_files, fn {name, _} ->
+          to_string(name) == "word/_rels/document.xml.rels"
+        end)
+
       {_, output_rels_content} = output_rels_file
       output_rels_str = to_string(output_rels_content)
       output_rel_count = output_rels_str |> String.split("<Relationship ") |> length() |> Kernel.-(1)
