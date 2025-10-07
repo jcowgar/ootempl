@@ -603,6 +603,7 @@ defmodule Ootempl.Integration.RenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
     end
 
+    # Skip: Table no template fixture file is missing or incomplete
     @tag :skip
     test "handles table without templates (regular variable replacement only)" do
       # Arrange - table with no list placeholders, just regular variables
