@@ -208,3 +208,98 @@ defmodule Ootempl.PlaceholderError do
     "#{count} placeholders could not be resolved (first: #{first.placeholder})"
   end
 end
+
+defmodule Ootempl.ImageError do
+  @moduledoc """
+  Raised when an image replacement operation fails.
+
+  This error indicates a problem with image file handling during template rendering.
+  The error provides detailed context about which placeholder failed and why.
+
+  ## Common Reasons
+
+  - `:image_not_found_in_data` - Placeholder exists in template but no image path provided in data
+  - `:file_not_found` - Image file doesn't exist at the provided path
+  - `:file_not_readable` - Image file exists but cannot be read (permission issue)
+  - `:unsupported_format` - Image format is not supported (only PNG, JPEG, GIF supported)
+  - `:cannot_read_dimensions` - Image file is corrupt or dimensions cannot be extracted
+
+  ## Examples
+
+      # Missing image path in data
+      iex> Ootempl.render("template.docx", %{}, "out.docx")
+      {:error, %Ootempl.ImageError{
+        message: "Image placeholder '@image:logo@' has no corresponding data key 'logo'",
+        placeholder_name: "logo",
+        image_path: nil,
+        reason: :image_not_found_in_data
+      }}
+
+      # Image file doesn't exist
+      iex> Ootempl.render("template.docx", %{"logo" => "/missing/logo.png"}, "out.docx")
+      {:error, %Ootempl.ImageError{
+        message: "Image file not found for placeholder 'logo': /missing/logo.png",
+        placeholder_name: "logo",
+        image_path: "/missing/logo.png",
+        reason: :file_not_found
+      }}
+
+      # Unsupported format
+      iex> Ootempl.render("template.docx", %{"logo" => "logo.bmp"}, "out.docx")
+      {:error, %Ootempl.ImageError{
+        message: "Unsupported image format for placeholder 'logo': logo.bmp (only PNG, JPEG, GIF supported)",
+        placeholder_name: "logo",
+        image_path: "logo.bmp",
+        reason: :unsupported_format
+      }}
+  """
+  defexception [:message, :placeholder_name, :image_path, :reason]
+
+  @type t :: %__MODULE__{
+          message: String.t(),
+          placeholder_name: String.t() | nil,
+          image_path: String.t() | nil,
+          reason: atom()
+        }
+
+  @impl true
+  def exception(opts) do
+    placeholder_name = Keyword.get(opts, :placeholder_name)
+    image_path = Keyword.get(opts, :image_path)
+    reason = Keyword.fetch!(opts, :reason)
+
+    message = build_message(placeholder_name, image_path, reason)
+
+    %__MODULE__{
+      message: message,
+      placeholder_name: placeholder_name,
+      image_path: image_path,
+      reason: reason
+    }
+  end
+
+  defp build_message(placeholder_name, nil, :image_not_found_in_data) do
+    "Image placeholder '@image:#{placeholder_name}@' has no corresponding data key '#{placeholder_name}'"
+  end
+
+  defp build_message(placeholder_name, image_path, :file_not_found) do
+    "Image file not found for placeholder '#{placeholder_name}': #{image_path}"
+  end
+
+  defp build_message(placeholder_name, image_path, :file_not_readable) do
+    "Image file cannot be read for placeholder '#{placeholder_name}': #{image_path} (check file permissions)"
+  end
+
+  defp build_message(placeholder_name, image_path, :unsupported_format) do
+    extension = Path.extname(image_path)
+    "Unsupported image format for placeholder '#{placeholder_name}': #{image_path} (format: #{extension}, only PNG, JPEG, GIF supported)"
+  end
+
+  defp build_message(placeholder_name, image_path, :cannot_read_dimensions) do
+    "Cannot read image dimensions for placeholder '#{placeholder_name}': #{image_path} (file may be corrupt)"
+  end
+
+  defp build_message(placeholder_name, image_path, reason) do
+    "Image processing failed for placeholder '#{placeholder_name}' at #{image_path}: #{inspect(reason)}"
+  end
+end

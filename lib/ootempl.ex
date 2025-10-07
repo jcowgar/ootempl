@@ -14,6 +14,8 @@ defmodule Ootempl do
   - Conditional sections with `@if:condition@...@endif@` syntax
   - Dynamic table row generation from list data
   - Multi-row table templates for complex layouts
+  - Replace placeholder images with dynamic content (PNG, JPEG, GIF)
+  - Automatic image dimension scaling with aspect ratio preservation
   - Case-insensitive placeholder matching
   - Process headers, footers, footnotes, and endnotes
   - Replace placeholders in document properties (title, author, company)
@@ -176,6 +178,110 @@ defmodule Ootempl do
   Ootempl.render("template.docx", data, "output.docx")
   ```
 
+  ### Image Replacement
+
+  Replace placeholder images in templates with dynamic images from your data. Use the
+  alt text field in Word to mark placeholder images with `@image:name@` markers.
+
+  **Preparing templates in Word:**
+
+  1. Insert a placeholder image (any PNG, JPEG, or GIF)
+  2. Right-click the image → "View Alt Text" (or "Edit Alt Text")
+  3. Set the alt text to `@image:placeholder_name@` (e.g., `@image:company_logo@`)
+  4. Save the template
+
+  **Data structure:**
+
+  Provide image file paths in your data map using the placeholder name as the key:
+
+  ```elixir
+  data = %{
+    "company_logo" => "/path/to/logo.png",
+    "employee_photo" => "/path/to/photo.jpg",
+    "signature" => "/path/to/signature.gif"
+  }
+  Ootempl.render("template.docx", data, "output.docx")
+  #=> :ok
+  ```
+
+  **Image format support:**
+
+  - **PNG** - Portable Network Graphics (`.png`)
+  - **JPEG** - Joint Photographic Experts Group (`.jpg`, `.jpeg`)
+  - **GIF** - Graphics Interchange Format (`.gif`)
+
+  **Automatic dimension scaling:**
+
+  Images are automatically scaled to fit the placeholder dimensions while preserving
+  aspect ratio. The library calculates the minimum scale factor needed to fit the
+  image within the template bounds:
+
+  ```elixir
+  # Template has 200x100 EMU placeholder
+  # Image is 800x600 pixels → scaled by 0.25x to fit
+  # Image is 150x75 pixels → scaled by 1.33x to fill space
+
+  data = %{"logo" => "large_image.png"}
+  Ootempl.render("template.docx", data, "output.docx")
+  # Image automatically scaled to fit placeholder bounds
+  ```
+
+  **Multiple images:**
+
+  Templates can contain multiple placeholder images, each with a unique marker:
+
+  ```elixir
+  # Template contains three images:
+  # - Header logo with alt text: @image:company_logo@
+  # - Employee photo with alt text: @image:employee_photo@
+  # - Footer signature with alt text: @image:signature@
+
+  data = %{
+    "company_logo" => "assets/logo.png",
+    "employee_photo" => "photos/john_doe.jpg",
+    "signature" => "signatures/ceo.gif"
+  }
+  Ootempl.render("contract_template.docx", data, "contract.docx")
+  #=> :ok
+  # All three images replaced with dynamic content
+  ```
+
+  **Error handling:**
+
+  Image replacement returns errors for missing data or invalid files:
+
+  ```elixir
+  # Missing image key in data
+  data = %{"name" => "John"}
+  Ootempl.render("template.docx", data, "output.docx")
+  #=> {:error, %Ootempl.ImageError{
+  #     message: "Image placeholder '@image:logo@' has no corresponding data key 'logo'",
+  #     placeholder_name: "logo",
+  #     image_path: nil,
+  #     reason: :image_not_found_in_data
+  #   }}
+
+  # Image file doesn't exist
+  data = %{"logo" => "nonexistent.png"}
+  Ootempl.render("template.docx", data, "output.docx")
+  #=> {:error, %Ootempl.ImageError{
+  #     message: "Image file not found for placeholder 'logo': nonexistent.png",
+  #     placeholder_name: "logo",
+  #     image_path: "nonexistent.png",
+  #     reason: :file_not_found
+  #   }}
+
+  # Unsupported format
+  data = %{"logo" => "document.pdf"}
+  Ootempl.render("template.docx", data, "output.docx")
+  #=> {:error, %Ootempl.ImageError{
+  #     message: "Unsupported image format for placeholder 'logo': document.pdf (format: .pdf, only PNG, JPEG, GIF supported)",
+  #     placeholder_name: "logo",
+  #     image_path: "document.pdf",
+  #     reason: :unsupported_format
+  #   }}
+  ```
+
   ## Architecture
 
   The library is organized into several modules:
@@ -207,6 +313,8 @@ defmodule Ootempl do
 
   alias Ootempl.Archive
   alias Ootempl.Conditional
+  alias Ootempl.Image
+  alias Ootempl.Relationships
   alias Ootempl.Replacement
   alias Ootempl.Table
   alias Ootempl.Validator
@@ -340,7 +448,8 @@ defmodule Ootempl do
          {:ok, conditional_processed_doc} <- process_conditionals(normalized_doc, data),
          {:ok, table_processed_doc} <- process_tables(conditional_processed_doc, data),
          {:ok, replaced_doc} <- Replacement.replace_in_document(table_processed_doc, data),
-         {:ok, modified_xml} <- Xml.serialize(replaced_doc),
+         {:ok, image_processed_doc} <- process_images(replaced_doc, data, temp_dir),
+         {:ok, modified_xml} <- Xml.serialize(image_processed_doc),
          :ok <- File.write(file_path, modified_xml) do
       :ok
     else
@@ -888,5 +997,373 @@ defmodule Ootempl do
       {:ok, nested_map} -> Map.merge(acc, nested_map)
       {:error, _} -> acc
     end
+  end
+
+  # Processes images in an XML document.
+  #
+  # Finds placeholder images (using Image.find_placeholder_images/1), validates image files,
+  # embeds them into the archive, updates relationships and content types, and updates
+  # image references in the document.
+  #
+  # This must run AFTER variable replacement to ensure placeholders in data are resolved first.
+  @spec process_images(Xml.xml_element(), map(), Path.t()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_images(xml_doc, data, temp_dir) do
+    # Find all placeholder images in the document
+    placeholders = Image.find_placeholder_images(xml_doc)
+
+    # If no placeholders, return document unchanged
+    if Enum.empty?(placeholders) do
+      {:ok, xml_doc}
+    else
+      # Process each placeholder
+      process_all_image_placeholders(xml_doc, placeholders, data, temp_dir)
+    end
+  end
+
+  # Processes all image placeholders
+  @spec process_all_image_placeholders(
+          Xml.xml_element(),
+          [map()],
+          map(),
+          Path.t()
+        ) :: {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_all_image_placeholders(xml_doc, placeholders, data, temp_dir) do
+    # Load relationships file
+    rels_path = Path.join(temp_dir, "word/_rels/document.xml.rels")
+
+    with {:ok, rels_xml} <- load_relationships(rels_path),
+         {:ok, content_types_xml} <- load_content_types(temp_dir),
+         {:ok, modified_doc, updated_rels, updated_types} <-
+           process_each_placeholder(xml_doc, placeholders, data, temp_dir, rels_xml, content_types_xml),
+         :ok <- save_relationships(rels_path, updated_rels),
+         :ok <- save_content_types(temp_dir, updated_types) do
+      {:ok, modified_doc}
+    end
+  end
+
+  # Processes each placeholder sequentially
+  @spec process_each_placeholder(
+          Xml.xml_element(),
+          [map()],
+          map(),
+          Path.t(),
+          Xml.xml_element(),
+          tuple()
+        ) :: {:ok, Xml.xml_element(), Xml.xml_element(), tuple()} | {:error, term()}
+  defp process_each_placeholder(xml_doc, [], _data, _temp_dir, rels_xml, content_types_xml) do
+    {:ok, xml_doc, rels_xml, content_types_xml}
+  end
+
+  defp process_each_placeholder(
+         xml_doc,
+         [placeholder | rest],
+         data,
+         temp_dir,
+         rels_xml,
+         content_types_xml
+       ) do
+    with {:ok, modified_doc, updated_rels, updated_types} <-
+           process_single_image_placeholder(
+             xml_doc,
+             placeholder,
+             data,
+             temp_dir,
+             rels_xml,
+             content_types_xml
+           ) do
+      process_each_placeholder(modified_doc, rest, data, temp_dir, updated_rels, updated_types)
+    end
+  end
+
+  # Processes a single image placeholder
+  @spec process_single_image_placeholder(
+          Xml.xml_element(),
+          map(),
+          map(),
+          Path.t(),
+          Xml.xml_element(),
+          tuple()
+        ) :: {:ok, Xml.xml_element(), Xml.xml_element(), tuple()} | {:error, term()}
+  defp process_single_image_placeholder(
+         xml_doc,
+         placeholder,
+         data,
+         temp_dir,
+         rels_xml,
+         content_types_xml
+       ) do
+    # Get image path from data
+    image_path = Map.get(data, placeholder.placeholder_name)
+
+    if is_nil(image_path) do
+      {:error,
+       Ootempl.ImageError.exception(
+         placeholder_name: placeholder.placeholder_name,
+         image_path: nil,
+         reason: :image_not_found_in_data
+       )}
+    else
+      with :ok <- Image.validate_image_file(image_path),
+           {:ok, image_dims} <- Image.get_image_dimensions(image_path),
+           {scaled_width, scaled_height} <-
+             Image.calculate_scaled_dimensions(image_dims, placeholder.template_dimensions),
+           extension <- Path.extname(image_path),
+           existing_ids <- Relationships.extract_relationship_ids(rels_xml),
+           new_rel_id <- Relationships.generate_unique_id(existing_ids),
+           existing_media_files <- list_existing_media_files(temp_dir),
+           media_filename <- Image.generate_media_filename(existing_media_files, extension),
+           :ok <- embed_image_to_media(temp_dir, image_path, media_filename),
+           relationship <-
+             Relationships.create_image_relationship(new_rel_id, "media/#{media_filename}"),
+           updated_rels <- Relationships.add_relationship(rels_xml, relationship),
+           mime_type <- Image.mime_type_for_extension(extension),
+           updated_types <- add_image_content_type(content_types_xml, extension, mime_type),
+           modified_doc <-
+             update_image_reference(
+               xml_doc,
+               placeholder,
+               new_rel_id,
+               scaled_width,
+               scaled_height
+             ) do
+        {:ok, modified_doc, updated_rels, updated_types}
+      else
+        {:error, atom} when is_atom(atom) ->
+          {:error,
+           Ootempl.ImageError.exception(
+             placeholder_name: placeholder.placeholder_name,
+             image_path: image_path,
+             reason: atom
+           )}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  # Loads relationships XML from file
+  @spec load_relationships(Path.t()) :: {:ok, Xml.xml_element()} | {:error, term()}
+  defp load_relationships(rels_path) do
+    with {:ok, xml_content} <- File.read(rels_path),
+         {:ok, rels_xml} <- Relationships.parse_relationships(xml_content) do
+      {:ok, rels_xml}
+    else
+      {:error, reason} -> {:error, {:load_relationships_failed, reason}}
+    end
+  end
+
+  # Loads content types XML from file
+  @spec load_content_types(Path.t()) :: {:ok, tuple()} | {:error, term()}
+  defp load_content_types(temp_dir) do
+    content_types_path = Path.join(temp_dir, "[Content_Types].xml")
+
+    with {:ok, xml_content} <- File.read(content_types_path),
+         {:ok, types_xml} <- Image.parse_content_types(xml_content) do
+      {:ok, types_xml}
+    else
+      {:error, reason} -> {:error, {:load_content_types_failed, reason}}
+    end
+  end
+
+  # Saves relationships XML to file
+  @spec save_relationships(Path.t(), Xml.xml_element()) :: :ok | {:error, term()}
+  defp save_relationships(rels_path, rels_xml) do
+    with {:ok, xml_string} <- Relationships.serialize_relationships(rels_xml),
+         :ok <- File.write(rels_path, xml_string) do
+      :ok
+    else
+      {:error, reason} -> {:error, {:save_relationships_failed, reason}}
+    end
+  end
+
+  # Saves content types XML to file
+  @spec save_content_types(Path.t(), tuple()) :: :ok | {:error, term()}
+  defp save_content_types(temp_dir, types_xml) do
+    content_types_path = Path.join(temp_dir, "[Content_Types].xml")
+    xml_string = Image.serialize_content_types(types_xml)
+
+    case File.write(content_types_path, xml_string) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:save_content_types_failed, reason}}
+    end
+  end
+
+  # Lists existing media files in the word/media directory
+  @spec list_existing_media_files(Path.t()) :: [String.t()]
+  defp list_existing_media_files(temp_dir) do
+    media_dir = Path.join(temp_dir, "word/media")
+
+    case File.ls(media_dir) do
+      {:ok, files} -> files
+      {:error, _} -> []
+    end
+  end
+
+  # Embeds image file into the word/media directory
+  @spec embed_image_to_media(Path.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  defp embed_image_to_media(temp_dir, image_path, media_filename) do
+    media_dir = Path.join(temp_dir, "word/media")
+    File.mkdir_p(media_dir)
+
+    destination_path = Path.join(media_dir, media_filename)
+
+    case File.copy(image_path, destination_path) do
+      {:ok, _bytes} -> :ok
+      {:error, reason} -> {:error, {:copy_image_failed, reason}}
+    end
+  end
+
+  # Adds image content type to content types XML
+  @spec add_image_content_type(tuple(), String.t(), String.t()) :: tuple()
+  defp add_image_content_type(content_types_xml, extension, mime_type) do
+    # Remove leading dot from extension if present
+    normalized_ext = String.trim_leading(extension, ".")
+    Image.add_content_type(content_types_xml, normalized_ext, mime_type)
+  end
+
+  # Updates image reference in the document with new relationship ID and dimensions
+  @spec update_image_reference(
+          Xml.xml_element(),
+          map(),
+          String.t(),
+          float(),
+          float()
+        ) :: Xml.xml_element()
+  defp update_image_reference(xml_doc, placeholder, new_rel_id, scaled_width, scaled_height) do
+    # Find the blip element within the drawing
+    blip_element = find_blip_in_drawing(placeholder.xml_element)
+
+    if is_nil(blip_element) do
+      xml_doc
+    else
+      # Update the r:embed attribute to point to new relationship ID
+      updated_blip = update_blip_relationship(blip_element, new_rel_id)
+
+      # Find extent element and update dimensions
+      extent_element = find_extent_in_drawing(placeholder.xml_element)
+
+      updated_extent =
+        if is_nil(extent_element) do
+          nil
+        else
+          update_extent_dimensions(extent_element, scaled_width, scaled_height)
+        end
+
+      # Replace blip and extent in the document
+      xml_doc
+      |> replace_element_in_tree(blip_element, updated_blip)
+      |> maybe_replace_extent(extent_element, updated_extent)
+    end
+  end
+
+  # Conditionally replaces extent element if both old and new are present
+  @spec maybe_replace_extent(Xml.xml_element(), tuple() | nil, tuple() | nil) ::
+          Xml.xml_element()
+  defp maybe_replace_extent(xml_doc, nil, _new_extent), do: xml_doc
+  defp maybe_replace_extent(xml_doc, _old_extent, nil), do: xml_doc
+
+  defp maybe_replace_extent(xml_doc, old_extent, new_extent) do
+    replace_element_in_tree(xml_doc, old_extent, new_extent)
+  end
+
+  # Finds blip element in a drawing element
+  @spec find_blip_in_drawing(tuple()) :: tuple() | nil
+  defp find_blip_in_drawing(drawing_element) do
+    import Xml
+
+    case drawing_element do
+      xmlElement(name: name, content: content) ->
+        current_name = name |> Atom.to_string() |> String.split(":") |> List.last()
+
+        if current_name == "blip" do
+          drawing_element
+        else
+          Enum.find_value(content, &find_blip_in_drawing/1)
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  # Finds extent element in a drawing element
+  @spec find_extent_in_drawing(tuple()) :: tuple() | nil
+  defp find_extent_in_drawing(drawing_element) do
+    import Xml
+
+    case drawing_element do
+      xmlElement(name: name, content: content) ->
+        current_name = name |> Atom.to_string() |> String.split(":") |> List.last()
+
+        if current_name == "extent" do
+          drawing_element
+        else
+          Enum.find_value(content, &find_extent_in_drawing/1)
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  # Updates blip element's r:embed attribute
+  @spec update_blip_relationship(tuple(), String.t()) :: tuple()
+  defp update_blip_relationship(blip_element, new_rel_id) do
+    import Xml
+
+    xmlElement(attributes: attrs) = blip_element
+
+    # Update or add r:embed attribute
+    updated_attrs =
+      Enum.map(attrs, fn attr ->
+        xmlAttribute(name: name) = attr
+        attr_name_str = Atom.to_string(name)
+
+        if String.ends_with?(attr_name_str, "embed") do
+          xmlAttribute(attr, value: String.to_charlist(new_rel_id))
+        else
+          attr
+        end
+      end)
+
+    xmlElement(blip_element, attributes: updated_attrs)
+  end
+
+  # Updates extent element's cx and cy attributes (dimensions in EMUs)
+  @spec update_extent_dimensions(tuple(), float(), float()) :: tuple()
+  defp update_extent_dimensions(extent_element, width, height) do
+    import Xml
+
+    xmlElement(attributes: attrs) = extent_element
+
+    # Convert to EMUs (English Metric Units): 1 pixel ≈ 9525 EMUs at 96 DPI
+    # However, we should preserve the scale of the original template dimensions
+    # The scaled_width and scaled_height are already in the same units as template_dimensions
+    # So we just need to round them to integers
+
+    width_emus = round(width)
+    height_emus = round(height)
+
+    # Update cx and cy attributes
+    updated_attrs =
+      Enum.map(attrs, fn attr ->
+        xmlAttribute(name: name) = attr
+        attr_name = Atom.to_string(name)
+
+        cond do
+          attr_name == "cx" ->
+            xmlAttribute(attr, value: Integer.to_charlist(width_emus))
+
+          attr_name == "cy" ->
+            xmlAttribute(attr, value: Integer.to_charlist(height_emus))
+
+          true ->
+            attr
+        end
+      end)
+
+    xmlElement(extent_element, attributes: updated_attrs)
   end
 end
