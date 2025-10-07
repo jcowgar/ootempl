@@ -339,69 +339,11 @@ defmodule Ootempl.Table do
     end)
   end
 
-  @doc """
-  Deep clones a row XML element.
-
-  Creates a complete copy of the row XML structure, including all child elements,
-  attributes, and text nodes. This preserves all formatting (borders, shading,
-  alignment, cell widths) from the template row.
-
-  ## Parameters
-
-    - `row_element` - The row XML element to clone
-
-  ## Returns
-
-    - A new row XML element with identical structure and content
-
-  ## Examples
-
-      cloned = Ootempl.Table.clone_row(template_row)
-      # cloned has same structure but is a separate copy
-  """
   @spec clone_row(Ootempl.Xml.xml_element()) :: Ootempl.Xml.xml_element()
-  def clone_row(row_element) do
+  defp clone_row(row_element) do
     clone_element(row_element)
   end
 
-  @doc """
-  Merges list item data with parent context data.
-
-  Creates a scoped data structure for a duplicated row by combining the current
-  list item's data with the parent data context. This allows placeholders in the
-  row to reference both list-specific fields (e.g., `@claims.id@`) and non-list
-  fields (e.g., `@first_name@`).
-
-  List item data takes precedence over parent data if there are key conflicts.
-
-  ## Parameters
-
-    - `list_item` - The current list item data (map)
-    - `parent_data` - The parent context data (map, excluding the list itself)
-
-  ## Returns
-
-    - A merged map combining both contexts
-
-  ## Examples
-
-      parent = %{"first_name" => "John", "company" => "Acme"}
-      item = %{"id" => 5565, "amount" => 1000}
-
-      Ootempl.Table.scope_data(item, parent)
-      # => %{"first_name" => "John", "company" => "Acme", "id" => 5565, "amount" => 1000}
-
-      # List item overrides parent on conflict
-      parent = %{"status" => "active"}
-      item = %{"status" => "pending"}
-
-      Ootempl.Table.scope_data(item, parent)
-      # => %{"status" => "pending"}
-  """
-  @spec scope_data(map(), map()) :: map()
-  def scope_data(list_item, parent_data) when is_map(list_item) and is_map(parent_data) do
-    Map.merge(parent_data, list_item)
-  end
 
   @doc """
   Inserts duplicated rows into a table at the specified position.
@@ -494,7 +436,7 @@ defmodule Ootempl.Table do
   defp find_tables_recursive(element, acc) do
     # Check if this element is a table
     acc =
-      if element_name(element) == "w:tbl" do
+      if xmlElement(element, :name) |> Atom.to_string() == "w:tbl" do
         [element | acc]
       else
         acc

@@ -157,62 +157,10 @@ defmodule Ootempl.Image do
     end
   end
 
-  @doc """
-  Checks if an image file format is supported.
-
-  Supported formats: PNG, JPEG, GIF
-
-  ## Parameters
-
-    - `path` - The file path to check
-
-  ## Returns
-
-  `true` if the format is supported, `false` otherwise
-
-  ## Examples
-
-      iex> Ootempl.Image.supported_format?("/path/to/logo.png")
-      true
-
-      iex> Ootempl.Image.supported_format?("/path/to/file.bmp")
-      false
-  """
   @spec supported_format?(String.t()) :: boolean()
-  def supported_format?(path) when is_binary(path) do
+  defp supported_format?(path) when is_binary(path) do
     ext = path |> Path.extname() |> String.downcase()
     ext in [".png", ".jpg", ".jpeg", ".gif"]
-  end
-
-  @doc """
-  Embeds an image file into the .docx archive's media folder.
-
-  ## Parameters
-
-    - `archive_path` - Path to the .docx file
-    - `image_path` - Path to the image file to embed
-    - `media_filename` - Filename to use in the word/media/ folder (e.g., "image1.png")
-
-  ## Returns
-
-  - `:ok` on success
-  - `{:error, reason}` on failure
-
-  ## Examples
-
-      iex> Ootempl.Image.embed_image("doc.docx", "/path/to/logo.png", "image1.png")
-      :ok
-  """
-  @spec embed_image(String.t(), String.t(), String.t()) :: :ok | {:error, {atom(), term()}}
-  def embed_image(archive_path, image_path, media_filename) do
-    with {:ok, image_data} <- tag_error(File.read(image_path), :read_image),
-         {:ok, files} <- tag_error(:zip.unzip(to_charlist(archive_path), [:memory]), :unzip_archive),
-         media_path = to_charlist("word/media/#{media_filename}"),
-         updated_files = [{media_path, image_data} | files],
-         {:ok, {_filename, zip_data}} <-
-           tag_error(:zip.zip(to_charlist(archive_path), updated_files, [:memory]), :rezip_archive) do
-      tag_error(File.write(archive_path, zip_data), :write_archive)
-    end
   end
 
   @doc """
@@ -414,10 +362,6 @@ defmodule Ootempl.Image do
   end
 
   # Private helper functions
-
-  defp tag_error({:ok, val}, _tag), do: {:ok, val}
-  defp tag_error(:ok, _tag), do: :ok
-  defp tag_error({:error, reason}, tag), do: {:error, {tag, reason}}
 
   defp extension_already_exists?(content, extension) do
     Enum.any?(content, fn

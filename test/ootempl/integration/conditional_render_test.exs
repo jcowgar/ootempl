@@ -42,7 +42,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify conditional section was removed
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Before conditional"
       assert output_xml =~ "After conditional"
       refute output_xml =~ "Conditional content that should appear or disappear"
@@ -69,7 +69,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify section was kept, markers removed
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Before conditional"
       assert output_xml =~ "Conditional content that should appear or disappear"
       assert output_xml =~ "After conditional"
@@ -92,7 +92,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert result == :ok
 
       # Verify section was removed (0 is falsy)
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       refute output_xml =~ "Conditional content that should appear or disappear"
     end
 
@@ -111,7 +111,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert result == :ok
 
       # Verify section was removed (empty string is falsy)
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       refute output_xml =~ "Conditional content that should appear or disappear"
     end
 
@@ -130,7 +130,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert result == :ok
 
       # Verify section was kept (non-zero is truthy)
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Conditional content that should appear or disappear"
     end
 
@@ -168,7 +168,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify all disclaimer paragraphs were removed
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Document start"
       assert output_xml =~ "Document end"
       refute output_xml =~ "DISCLAIMER PARAGRAPH 1"
@@ -195,7 +195,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify all disclaimer paragraphs were kept
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Document start"
       assert output_xml =~ "DISCLAIMER PARAGRAPH 1"
       assert output_xml =~ "DISCLAIMER PARAGRAPH 2"
@@ -224,7 +224,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify first conditional kept, second removed
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Start"
       assert output_xml =~ "First conditional content"
       assert output_xml =~ "Middle"
@@ -249,7 +249,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert result == :ok
 
       # Verify all conditionals kept
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "First conditional content"
       assert output_xml =~ "Second conditional content"
     end
@@ -269,7 +269,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert result == :ok
 
       # Verify all conditionals removed
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       refute output_xml =~ "First conditional content"
       refute output_xml =~ "Second conditional content"
       assert output_xml =~ "Start"
@@ -296,7 +296,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify table was removed
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Before table"
       assert output_xml =~ "After table"
       refute output_xml =~ "Product A"
@@ -323,7 +323,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify table was kept
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Before table"
       assert output_xml =~ "Product A"
       assert output_xml =~ "$100"
@@ -369,7 +369,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert result == :ok
 
       # Verify variable was replaced but conditional section was removed
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Hello Alice"
       refute output_xml =~ "Message: Secret"
       refute output_xml =~ "@message@"

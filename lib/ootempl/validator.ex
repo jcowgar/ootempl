@@ -38,23 +38,8 @@ defmodule Ootempl.Validator do
     "_rels/.rels"
   ]
 
-  @doc """
-  Validates that a file is a valid ZIP archive.
-
-  Attempts to open the file as a ZIP archive using Erlang's `:zip` module.
-  Returns `:ok` if successful, or `{:error, exception}` if the file cannot
-  be opened as a ZIP archive.
-
-  ## Examples
-
-      iex> Ootempl.Validator.validate_archive("template.docx")
-      :ok
-
-      iex> Ootempl.Validator.validate_archive("not_a_zip.txt")
-      {:error, %Ootempl.InvalidArchiveError{}}
-  """
   @spec validate_archive(Path.t()) :: :ok | {:error, InvalidArchiveError.t()}
-  def validate_archive(path) do
+  defp validate_archive(path) do
     case :zip.zip_open(to_charlist(path), [:memory]) do
       {:ok, zip_handle} ->
         :zip.zip_close(zip_handle)
@@ -65,27 +50,8 @@ defmodule Ootempl.Validator do
     end
   end
 
-  @doc """
-  Validates that a .docx archive contains all required files.
-
-  Checks for the presence of:
-  - `word/document.xml` (primary content)
-  - `[Content_Types].xml` (MIME types)
-  - `_rels/.rels` (package relationships)
-
-  Returns `:ok` if all required files exist, or `{:error, exception}` if
-  any required file is missing.
-
-  ## Examples
-
-      iex> Ootempl.Validator.validate_structure("template.docx")
-      :ok
-
-      iex> Ootempl.Validator.validate_structure("incomplete.docx")
-      {:error, %Ootempl.MissingFileError{missing_file: "word/document.xml"}}
-  """
   @spec validate_structure(Path.t()) :: :ok | {:error, MissingFileError.t()}
-  def validate_structure(path) do
+  defp validate_structure(path) do
     case open_zip(path) do
       {:ok, zip_handle} ->
         try do
@@ -105,25 +71,8 @@ defmodule Ootempl.Validator do
     end
   end
 
-  @doc """
-  Validates that an XML string is well-formed.
-
-  Attempts to parse the XML using `:xmerl_scan`. Returns `:ok` if the XML
-  parses successfully, or `{:error, reason}` if parsing fails.
-
-  This function only checks if the XML is well-formed (valid syntax), not if
-  it conforms to any particular schema.
-
-  ## Examples
-
-      iex> Ootempl.Validator.validate_xml("<root><child>text</child></root>")
-      :ok
-
-      iex> Ootempl.Validator.validate_xml("<root><unclosed>")
-      {:error, {:fatal, ...}}
-  """
   @spec validate_xml(String.t()) :: :ok | {:error, term()}
-  def validate_xml(xml_string) when is_binary(xml_string) do
+  defp validate_xml(xml_string) when is_binary(xml_string) do
     charlist = String.to_charlist(xml_string)
 
     try do

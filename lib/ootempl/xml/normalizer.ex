@@ -82,28 +82,8 @@ defmodule Ootempl.Xml.Normalizer do
     end
   end
 
-  @doc """
-  Normalizes a Word paragraph element by collapsing fragmented placeholders.
-
-  Scans through runs in the paragraph, detects placeholders that are split
-  across multiple runs, and collapses them into single runs. Proofing markers
-  within placeholders are removed.
-
-  When fragments have inconsistent formatting, the most common formatting is applied
-  (majority rule). For example, if 3 fragments are bold and 2 are not, the result
-  will be bold. If all fragments have identical formatting, that formatting is preserved.
-  If there's a tie (equal counts of different formatting), all formatting is stripped.
-
-  ## Parameters
-
-    - `paragraph` - An xmerl element representing a `<w:p>` paragraph
-
-  ## Returns
-
-    - The normalized paragraph element
-  """
   @spec normalize_paragraph(Ootempl.Xml.xml_element()) :: Ootempl.Xml.xml_element()
-  def normalize_paragraph(paragraph) do
+  defp normalize_paragraph(paragraph) do
     content = xmlElement(paragraph, :content)
     # Filter out proofing errors
     filtered_content = Enum.reject(content, &proofing_error?/1)

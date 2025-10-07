@@ -75,7 +75,7 @@ defmodule OotemplTest do
       Ootempl.render(template_path, @valid_data, output_path)
 
       # Assert - validate XML can be parsed
-      {:ok, xml_content} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, xml_content} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert {:ok, _doc} = Ootempl.Xml.parse(xml_content)
     end
 
@@ -201,7 +201,7 @@ defmodule OotemplTest do
       assert result == :ok
 
       # Verify placeholders were actually replaced
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Test User"
       assert output_xml =~ "2025-10-06"
     end
@@ -472,7 +472,7 @@ defmodule OotemplTest do
       assert File.exists?(output_path)
 
       # Verify placeholder replacement worked with struct field (atom key)
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Struct User"
       assert output_xml =~ "2025-10-07"
     end
@@ -525,7 +525,7 @@ defmodule OotemplTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Bob Smith"
       assert output_xml =~ "bob@example.com"
       assert output_xml =~ "Boston"
@@ -572,7 +572,7 @@ defmodule OotemplTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Alice Johnson"
       assert output_xml =~ "alice@example.com"
     end
@@ -616,7 +616,7 @@ defmodule OotemplTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Customer 1"
       assert output_xml =~ "Customer 2"
     end
@@ -711,7 +711,7 @@ defmodule OotemplTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Mixed Data User"
       assert output_xml =~ "ORD-12345"
       assert output_xml =~ "shipped"

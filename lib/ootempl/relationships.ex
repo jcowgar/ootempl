@@ -47,6 +47,7 @@ defmodule Ootempl.Relationships do
   """
 
   import Ootempl.Xml
+  require Record
 
   @type relationship :: %{
           id: String.t(),
@@ -86,13 +87,8 @@ defmodule Ootempl.Relationships do
   @spec extract_relationship_ids(Ootempl.Xml.xml_element()) :: [String.t()]
   def extract_relationship_ids(rels_xml) do
     rels_xml
-    |> Ootempl.Xml.find_elements(:Relationship)
-    |> Enum.map(fn rel ->
-      case Ootempl.Xml.get_attribute(rel, :Id) do
-        {:ok, id} -> id
-        {:error, :not_found} -> nil
-      end
-    end)
+    |> find_relationship_elements()
+    |> Enum.map(&extract_id_attribute/1)
     |> Enum.reject(&is_nil/1)
   end
 
@@ -209,30 +205,27 @@ defmodule Ootempl.Relationships do
     Ootempl.Xml.serialize(rels_xml)
   end
 
-  @doc """
-  Validates the structure of a relationship XML element.
+  # Private helpers
 
-  Checks that:
-  - The root element is named `Relationships`
-  - All `Relationship` children have required attributes: `Id`, `Type`, `Target`
-
-  Returns `:ok` if valid, or `{:error, reason}` if validation fails.
-
-  ## Examples
-
-      iex> xml = ~s(<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>)
-      iex> {:ok, rels} = Ootempl.Relationships.parse_relationships(xml)
-      iex> Ootempl.Relationships.validate_relationships(rels)
-      :ok
-  """
-  @spec validate_relationships(Ootempl.Xml.xml_element()) :: :ok | {:error, String.t()}
-  def validate_relationships(rels_xml) do
-    with :ok <- validate_root_element(rels_xml) do
-      validate_relationship_elements(rels_xml)
-    end
+  @spec find_relationship_elements(Ootempl.Xml.xml_element()) :: [Ootempl.Xml.xml_element()]
+  defp find_relationship_elements(rels_xml) do
+    rels_xml
+    |> xmlElement(:content)
+    |> Enum.filter(fn node ->
+      Record.is_record(node, :xmlElement) && xmlElement(node, :name) == :Relationship
+    end)
   end
 
-  # Private helpers
+  @spec extract_id_attribute(Ootempl.Xml.xml_element()) :: String.t() | nil
+  defp extract_id_attribute(rel_element) do
+    rel_element
+    |> xmlElement(:attributes)
+    |> Enum.find(fn attr -> xmlAttribute(attr, :name) == :Id end)
+    |> case do
+      nil -> nil
+      attr -> attr |> xmlAttribute(:value) |> List.to_string()
+    end
+  end
 
   @spec generate_non_colliding_id(integer(), [String.t()]) :: String.t()
   defp generate_non_colliding_id(number, existing_ids) do
@@ -253,45 +246,4 @@ defmodule Ootempl.Relationships do
     end
   end
 
-  @spec validate_root_element(Ootempl.Xml.xml_element()) :: :ok | {:error, String.t()}
-  defp validate_root_element(rels_xml) do
-    name = Ootempl.Xml.element_name(rels_xml)
-
-    if name == "Relationships" do
-      :ok
-    else
-      {:error, "Root element must be 'Relationships', got '#{name}'"}
-    end
-  end
-
-  @spec validate_relationship_elements(Ootempl.Xml.xml_element()) ::
-          :ok | {:error, String.t()}
-  defp validate_relationship_elements(rels_xml) do
-    rels_xml
-    |> Ootempl.Xml.find_elements(:Relationship)
-    |> Enum.reduce_while(:ok, fn rel, _acc ->
-      case validate_relationship_attributes(rel) do
-        :ok -> {:cont, :ok}
-        error -> {:halt, error}
-      end
-    end)
-  end
-
-  @spec validate_relationship_attributes(Ootempl.Xml.xml_element()) ::
-          :ok | {:error, String.t()}
-  defp validate_relationship_attributes(rel) do
-    required_attrs = [:Id, :Type, :Target]
-
-    missing_attrs =
-      Enum.reject(required_attrs, fn attr ->
-        match?({:ok, _}, Ootempl.Xml.get_attribute(rel, attr))
-      end)
-
-    if Enum.empty?(missing_attrs) do
-      :ok
-    else
-      missing = Enum.map_join(missing_attrs, ", ", &to_string/1)
-      {:error, "Relationship missing required attributes: #{missing}"}
-    end
-  end
 end

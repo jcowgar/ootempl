@@ -10,6 +10,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
   """
 
   use ExUnit.Case
+  import Ootempl.Xml
 
   @template_path "test/fixtures/Table Repeating Rows from Word.docx"
   @output_path "test/fixtures/table_repeating_word_output.docx"
@@ -44,7 +45,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       assert result == :ok
       assert File.exists?(@output_path)
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
 
       # Verify opening text
       assert output_xml =~ "John"
@@ -94,7 +95,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       # Assert
       assert result == :ok
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
 
       assert output_xml =~ "Sarah"
       assert output_xml =~ "Tech Inc"
@@ -118,7 +119,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       # Assert
       assert result == :ok
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
 
       # Should have the opening text and average
       assert output_xml =~ "Manager"
@@ -146,7 +147,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       # Assert
       assert result == :ok
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
 
       # Numbers should be converted to strings
       assert output_xml =~ "25"
@@ -171,7 +172,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       # Assert
       assert result == :ok
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
 
       # XML should be well-formed
       assert {:ok, _parsed} = Ootempl.Xml.parse(output_xml)
@@ -215,18 +216,18 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       }
 
       # Get original table count
-      {:ok, template_xml} = Ootempl.Archive.extract_file(@template_path, "word/document.xml")
+      {:ok, template_xml} = OotemplTestHelpers.extract_file_for_test(@template_path, "word/document.xml")
       {:ok, template_doc} = Ootempl.Xml.parse(template_xml)
 
       # Act
       Ootempl.render(@template_path, data, @output_path)
 
       # Assert
-      {:ok, output_xml} = Ootempl.Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
       {:ok, output_doc} = Ootempl.Xml.parse(output_xml)
 
       # Document root should be the same
-      assert Ootempl.Xml.element_name(template_doc) == Ootempl.Xml.element_name(output_doc)
+      assert xmlElement(template_doc, :name) == xmlElement(output_doc, :name)
     end
 
     test "returns error when required data is missing" do
@@ -269,7 +270,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       # Assert
       assert result == :ok
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
 
       # Spot check first, middle, and last entries
       assert output_xml =~ "Person1"

@@ -71,68 +71,6 @@ defmodule Ootempl.ArchiveTest do
     end
   end
 
-  describe "extract_file/2" do
-    test "successfully extracts a specific file from .docx archive" do
-      # Arrange
-      FixtureHelper.create_minimal_docx(@fixture_path)
-
-      # Act
-      result = Archive.extract_file(@fixture_path, "word/document.xml")
-
-      # Assert
-      assert {:ok, content} = result
-      assert is_binary(content)
-      assert content =~ "Hello, World!"
-    end
-
-    test "extracts [Content_Types].xml from archive" do
-      # Arrange
-      FixtureHelper.create_minimal_docx(@fixture_path)
-
-      # Act
-      result = Archive.extract_file(@fixture_path, "[Content_Types].xml")
-
-      # Assert
-      assert {:ok, content} = result
-      assert is_binary(content)
-      assert content =~ "Types"
-    end
-
-    test "returns error when file does not exist in archive" do
-      # Arrange
-      FixtureHelper.create_minimal_docx(@fixture_path)
-
-      # Act
-      result = Archive.extract_file(@fixture_path, "nonexistent.xml")
-
-      # Assert
-      assert {:error, :file_not_found} = result
-    end
-
-    test "returns error when .docx file does not exist" do
-      # Arrange
-      non_existent_path = "test/tmp/nonexistent.docx"
-
-      # Act
-      result = Archive.extract_file(non_existent_path, "word/document.xml")
-
-      # Assert
-      assert {:error, :file_not_found} = result
-    end
-
-    test "returns error for invalid ZIP file" do
-      # Arrange
-      invalid_zip_path = "test/tmp/invalid.docx"
-      File.write!(invalid_zip_path, "not a zip file")
-
-      # Act
-      result = Archive.extract_file(invalid_zip_path, "word/document.xml")
-
-      # Assert
-      assert {:error, _reason} = result
-    end
-  end
-
   describe "create/2" do
     test "successfully creates a .docx archive from file map" do
       # Arrange
@@ -188,7 +126,7 @@ defmodule Ootempl.ArchiveTest do
       Archive.create(file_map, @output_path)
 
       # Assert
-      {:ok, extracted_content} = Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, extracted_content} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
       assert extracted_content == original_content
     end
 
@@ -253,10 +191,10 @@ defmodule Ootempl.ArchiveTest do
       FixtureHelper.create_minimal_docx(@fixture_path)
 
       # Act - Extract specific files and recreate
-      {:ok, content_types} = Archive.extract_file(@fixture_path, "[Content_Types].xml")
-      {:ok, document} = Archive.extract_file(@fixture_path, "word/document.xml")
-      {:ok, rels} = Archive.extract_file(@fixture_path, "_rels/.rels")
-      {:ok, doc_rels} = Archive.extract_file(@fixture_path, "word/_rels/document.xml.rels")
+      {:ok, content_types} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "[Content_Types].xml")
+      {:ok, document} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "word/document.xml")
+      {:ok, rels} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "_rels/.rels")
+      {:ok, doc_rels} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "word/_rels/document.xml.rels")
 
       file_map = %{
         "[Content_Types].xml" => content_types,
@@ -268,8 +206,8 @@ defmodule Ootempl.ArchiveTest do
       Archive.create(file_map, @output_path)
 
       # Assert - verify recreated archive has same content
-      {:ok, new_document} = Archive.extract_file(@output_path, "word/document.xml")
-      {:ok, new_content_types} = Archive.extract_file(@output_path, "[Content_Types].xml")
+      {:ok, new_document} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
+      {:ok, new_content_types} = OotemplTestHelpers.extract_file_for_test(@output_path, "[Content_Types].xml")
 
       assert new_document == document
       assert new_content_types == content_types
@@ -278,14 +216,14 @@ defmodule Ootempl.ArchiveTest do
     test "modifying and recreating produces valid archive" do
       # Arrange
       FixtureHelper.create_minimal_docx(@fixture_path)
-      {:ok, original_content} = Archive.extract_file(@fixture_path, "word/document.xml")
+      {:ok, original_content} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "word/document.xml")
 
       # Act - Modify content
       modified_content = String.replace(original_content, "Hello, World!", "Modified Text")
 
-      {:ok, content_types} = Archive.extract_file(@fixture_path, "[Content_Types].xml")
-      {:ok, rels} = Archive.extract_file(@fixture_path, "_rels/.rels")
-      {:ok, doc_rels} = Archive.extract_file(@fixture_path, "word/_rels/document.xml.rels")
+      {:ok, content_types} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "[Content_Types].xml")
+      {:ok, rels} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "_rels/.rels")
+      {:ok, doc_rels} = OotemplTestHelpers.extract_file_for_test(@fixture_path, "word/_rels/document.xml.rels")
 
       file_map = %{
         "[Content_Types].xml" => content_types,
@@ -297,7 +235,7 @@ defmodule Ootempl.ArchiveTest do
       Archive.create(file_map, @output_path)
 
       # Assert
-      {:ok, result_content} = Archive.extract_file(@output_path, "word/document.xml")
+      {:ok, result_content} = OotemplTestHelpers.extract_file_for_test(@output_path, "word/document.xml")
       assert result_content == modified_content
       assert result_content =~ "Modified Text"
       refute result_content =~ "Hello, World!"

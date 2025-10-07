@@ -78,66 +78,9 @@ defmodule Ootempl.Placeholder do
     |> Enum.reverse()
   end
 
-  @doc """
-  Parses a variable string into path segments.
-
-  Splits the variable name by dots to support nested data access.
-
-  ## Parameters
-
-    - `variable` - The variable name to parse (without @ symbols)
-
-  ## Returns
-
-    - A list of path segments
-
-  ## Examples
-
-      iex> Ootempl.Placeholder.parse_path("name")
-      ["name"]
-
-      iex> Ootempl.Placeholder.parse_path("customer.name")
-      ["customer", "name"]
-
-      iex> Ootempl.Placeholder.parse_path("order.items.0.price")
-      ["order", "items", "0", "price"]
-  """
   @spec parse_path(String.t()) :: [String.t()]
-  def parse_path(variable) when is_binary(variable) do
+  defp parse_path(variable) when is_binary(variable) do
     String.split(variable, ".")
   end
 
-  @doc """
-  Checks if the given text is a valid placeholder.
-
-  ## Parameters
-
-    - `text` - The text to validate
-
-  ## Returns
-
-    - `true` if the text is a valid placeholder, `false` otherwise
-
-  ## Examples
-
-      iex> Ootempl.Placeholder.valid?("@name@")
-      true
-
-      iex> Ootempl.Placeholder.valid?("@customer.name@")
-      true
-
-      iex> Ootempl.Placeholder.valid?("@incomplete")
-      false
-
-      iex> Ootempl.Placeholder.valid?("not a placeholder")
-      false
-  """
-  @spec valid?(String.t()) :: boolean()
-  def valid?(text) when is_binary(text) do
-    Regex.match?(@placeholder_regex, text) and
-      String.starts_with?(text, "@") and
-      String.ends_with?(text, "@") and
-      not String.starts_with?(text, "@@") and
-      not String.ends_with?(text, "@@")
-  end
 end

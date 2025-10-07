@@ -392,7 +392,7 @@ defmodule Ootempl.ImageReplacementTest do
       rels_str = to_string(rels_content)
 
       # Extract all relationship IDs
-      ids = ~r/Id="(rId\d+)"/ |> Regex.scan(rels_str) |> Enum.map(fn [_, id] -> id end)
+      _ids = ~r/Id="(rId\d+)"/ |> Regex.scan(rels_str) |> Enum.map(fn [_, id] -> id end)
 
       # Note: The template has rId5 and rId6, and our code may reuse them when replacing images
       # The important thing is that we have relationship entries for the images

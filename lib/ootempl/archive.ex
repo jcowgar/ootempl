@@ -37,37 +37,6 @@ defmodule Ootempl.Archive do
   end
 
   @doc """
-  Extracts a specific file from a .docx archive.
-
-  Returns `{:ok, content}` where `content` is the binary content of the file,
-  or `{:error, reason}` if the file cannot be extracted.
-
-  ## Examples
-
-      iex> {:ok, xml} = Ootempl.Archive.extract_file("template.docx", "word/document.xml")
-      iex> is_binary(xml)
-      true
-
-      iex> Ootempl.Archive.extract_file("template.docx", "nonexistent.xml")
-      {:error, :file_not_found}
-  """
-  @spec extract_file(Path.t(), String.t()) :: {:ok, binary()} | {:error, term()}
-  def extract_file(docx_path, internal_path) do
-    with {:ok, _} <- validate_file(docx_path),
-         {:ok, zip_handle} <- open_zip_archive(docx_path) do
-      try do
-        case :zip.zip_get(to_charlist(internal_path), zip_handle) do
-          {:ok, {_name, content}} -> {:ok, content}
-          {:error, :file_not_found} -> {:error, :file_not_found}
-          {:error, reason} -> {:error, {:extract_file_failed, reason}}
-        end
-      after
-        :zip.zip_close(zip_handle)
-      end
-    end
-  end
-
-  @doc """
   Creates a .docx archive from a map of file paths to content.
 
   The `file_map` is a map where keys are internal paths (e.g., "word/document.xml")
@@ -128,14 +97,6 @@ defmodule Ootempl.Archive do
 
       true ->
         {:ok, :valid}
-    end
-  end
-
-  @spec open_zip_archive(Path.t()) :: {:ok, term()} | {:error, term()}
-  defp open_zip_archive(docx_path) do
-    case :zip.zip_open(to_charlist(docx_path), [:memory]) do
-      {:ok, zip_handle} -> {:ok, zip_handle}
-      {:error, reason} -> {:error, {:invalid_zip_archive, reason}}
     end
   end
 

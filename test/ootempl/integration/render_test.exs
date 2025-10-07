@@ -8,6 +8,7 @@ defmodule Ootempl.Integration.RenderTest do
   """
 
   use ExUnit.Case
+  import Ootempl.Xml
 
   @test_fixture "test/fixtures/Simple Placeholdes from Word.docx"
   @output_path "test/fixtures/integration_output.docx"
@@ -44,7 +45,7 @@ defmodule Ootempl.Integration.RenderTest do
       assert :ok = Ootempl.Validator.validate_docx(output_path)
 
       # Verify placeholders were replaced
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Marty McFly"
       assert output_xml =~ "October 26, 1985"
       refute output_xml =~ "@person.first_name@"
@@ -67,7 +68,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "George McFly"
       assert output_xml =~ "November 5, 1955"
     end
@@ -88,7 +89,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "1985"
       assert output_xml =~ "88"
     end
@@ -109,7 +110,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Biff Tannen"
       assert output_xml =~ "November 12, 1955"
     end
@@ -168,7 +169,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       # XML should be well-formed (escaped properly)
       assert {:ok, _parsed} = Ootempl.Xml.parse(output_xml)
@@ -238,7 +239,7 @@ defmodule Ootempl.Integration.RenderTest do
       Ootempl.render(template_path, data, output_path)
 
       # Assert - extract and validate document.xml
-      {:ok, xml_content} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, xml_content} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       # Should parse without errors
       assert {:ok, xml_doc} = Ootempl.Xml.parse(xml_content)
@@ -254,19 +255,19 @@ defmodule Ootempl.Integration.RenderTest do
       data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       # Get original document.xml
-      {:ok, original_xml} = Ootempl.Archive.extract_file(template_path, "word/document.xml")
+      {:ok, original_xml} = OotemplTestHelpers.extract_file_for_test(template_path, "word/document.xml")
       {:ok, original_doc} = Ootempl.Xml.parse(original_xml)
 
       # Act - render template
       Ootempl.render(template_path, data, output_path)
 
       # Assert - compare XML structure
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       {:ok, output_doc} = Ootempl.Xml.parse(output_xml)
 
       # Element names should match (basic structure check)
-      original_name = Ootempl.Xml.element_name(original_doc)
-      output_name = Ootempl.Xml.element_name(output_doc)
+      original_name = xmlElement(original_doc, :name)
+      output_name = xmlElement(output_doc, :name)
 
       assert original_name == output_name
     end
@@ -422,7 +423,7 @@ defmodule Ootempl.Integration.RenderTest do
       assert result == :ok
       assert File.exists?(output_path)
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       # Should have both claim IDs in output
       assert output_xml =~ "5565"
@@ -457,7 +458,7 @@ defmodule Ootempl.Integration.RenderTest do
       assert result == :ok
       assert File.exists?(output_path)
 
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       # Should have total but no claim rows
       assert output_xml =~ "0.00"
@@ -485,7 +486,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       assert output_xml =~ "101"
       assert output_xml =~ "102"
@@ -512,7 +513,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       assert output_xml =~ "100"
       assert output_xml =~ "Widget"
@@ -542,7 +543,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       assert output_xml =~ "1"
       assert output_xml =~ "100"
@@ -571,7 +572,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       # Check both regular variables and table items
       assert output_xml =~ "Acme Corp"
@@ -623,7 +624,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Assert
       assert result == :ok
-      {:ok, output_xml} = Ootempl.Archive.extract_file(output_path, "word/document.xml")
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
 
       assert output_xml =~ "John"
       assert output_xml =~ "100"
@@ -672,7 +673,7 @@ defmodule Ootempl.Integration.RenderTest do
       assert result == :ok
 
       # Verify header was processed
-      {:ok, header_xml} = Ootempl.Archive.extract_file(output_path, "word/header1.xml")
+      {:ok, header_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/header1.xml")
       assert header_xml =~ "Acme Corp"
       refute header_xml =~ "@company_name@"
     end
@@ -699,7 +700,7 @@ defmodule Ootempl.Integration.RenderTest do
       assert result == :ok
 
       # Verify footer was processed
-      {:ok, footer_xml} = Ootempl.Archive.extract_file(output_path, "word/footer1.xml")
+      {:ok, footer_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/footer1.xml")
       assert footer_xml =~ "Confidential"
       refute footer_xml =~ "@footer_text@"
     end
@@ -725,8 +726,8 @@ defmodule Ootempl.Integration.RenderTest do
       assert result == :ok
 
       # All headers should be processed
-      {:ok, header1} = Ootempl.Archive.extract_file(output_path, "word/header1.xml")
-      {:ok, header2} = Ootempl.Archive.extract_file(output_path, "word/header2.xml")
+      {:ok, header1} = OotemplTestHelpers.extract_file_for_test(output_path, "word/header1.xml")
+      {:ok, header2} = OotemplTestHelpers.extract_file_for_test(output_path, "word/header2.xml")
 
       assert header1 =~ "Document Title"
       assert header2 =~ "Document Title"
