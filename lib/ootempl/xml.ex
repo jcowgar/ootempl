@@ -71,11 +71,9 @@ defmodule Ootempl.Xml do
 
   ## Examples
 
-      iex> Ootempl.Xml.parse("<root><child>text</child></root>")
-      {:ok, {...}}
+      iex> {:ok, _doc} = Ootempl.Xml.parse("<root><child>text</child></root>")
 
-      iex> Ootempl.Xml.parse("<root><unclosed>")
-      {:error, _}
+      iex> {:error, _reason} = Ootempl.Xml.parse("<root><unclosed>")
   """
   @spec parse(String.t()) :: {:ok, xml_element()} | {:error, term()}
   def parse(xml_string) when is_binary(xml_string) do
@@ -143,7 +141,7 @@ defmodule Ootempl.Xml do
   ## Examples
 
       iex> {:ok, doc} = Ootempl.Xml.parse("<root><p>keep</p><p>remove</p></root>")
-      iex> [keep, remove] = Ootempl.Xml.find_elements(doc, :p)
+      iex> [_keep, remove] = Ootempl.Xml.find_elements(doc, :p)
       iex> modified = Ootempl.Xml.remove_nodes(doc, [remove])
       iex> Ootempl.Xml.find_elements(modified, :p) |> length()
       1

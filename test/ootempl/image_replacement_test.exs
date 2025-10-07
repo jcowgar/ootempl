@@ -525,7 +525,7 @@ defmodule Ootempl.ImageReplacementTest do
     @tag :tmp_dir
     test "handles document with no image placeholders", %{tmp_dir: tmp_dir} do
       # Arrange
-      template_path = "test/fixtures/Simple Placeholders.docx"
+      template_path = "test/fixtures/Simple Placeholdes from Word.docx"
       output_path = Path.join(tmp_dir, "output_no_images.docx")
 
       data = %{

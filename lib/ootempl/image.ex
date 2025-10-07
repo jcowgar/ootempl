@@ -549,12 +549,15 @@ defmodule Ootempl.Image do
     end
   end
 
-  defp read_png_dimensions(<<0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, _::binary>> = data) do
+  defp read_png_dimensions(<<0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, rest::binary>>) do
     # PNG signature verified, find IHDR chunk
-    <<_signature::binary-size(8), _chunk_length::32, "IHDR", width::32, height::32, _rest::binary>> =
-      data
+    case rest do
+      <<_chunk_length::32, "IHDR", width::32, height::32, _rest::binary>> ->
+        {:ok, {width, height}}
 
-    {:ok, {width, height}}
+      _ ->
+        {:error, :invalid_image_format}
+    end
   end
 
   defp read_png_dimensions(_), do: {:error, :invalid_image_format}
