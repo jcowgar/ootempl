@@ -1131,4 +1131,467 @@ defmodule Ootempl.ImageTest do
     run = xmlElement(name: :"w:r", content: [text])
     xmlElement(name: :"w:p", content: [run])
   end
+
+  describe "generate_media_filename/2" do
+    test "generates first filename when list is empty" do
+      # Arrange
+      existing_files = []
+      extension = ".png"
+
+      # Act
+      result = Image.generate_media_filename(existing_files, extension)
+
+      # Assert
+      assert result == "image1.png"
+    end
+
+    test "generates next sequential filename" do
+      # Arrange
+      existing_files = ["image1.png", "image2.jpg"]
+      extension = ".png"
+
+      # Act
+      result = Image.generate_media_filename(existing_files, extension)
+
+      # Assert
+      assert result == "image3.png"
+    end
+
+    test "handles non-sequential existing files" do
+      # Arrange
+      existing_files = ["image1.png", "image5.jpg", "image3.gif"]
+      extension = ".jpeg"
+
+      # Act
+      result = Image.generate_media_filename(existing_files, extension)
+
+      # Assert
+      assert result == "image6.jpeg"
+    end
+
+    test "handles files with different extensions" do
+      # Arrange
+      existing_files = ["image1.png", "image2.jpg", "image3.gif"]
+      extension = ".png"
+
+      # Act
+      result = Image.generate_media_filename(existing_files, extension)
+
+      # Assert
+      assert result == "image4.png"
+    end
+
+    test "handles mixed filename formats" do
+      # Arrange
+      existing_files = ["image1.png", "other_file.jpg", "image2.gif"]
+      extension = ".png"
+
+      # Act
+      result = Image.generate_media_filename(existing_files, extension)
+
+      # Assert
+      assert result == "image3.png"
+    end
+  end
+
+  describe "calculate_scaled_dimensions/2" do
+    test "scales down when source is larger than template" do
+      # Arrange
+      source_dims = {800, 600}
+      template_dims = {400, 400}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert result == {400.0, 300.0}
+    end
+
+    test "scales up when source is smaller than template" do
+      # Arrange
+      source_dims = {100, 100}
+      template_dims = {200, 200}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert result == {200.0, 200.0}
+    end
+
+    test "preserves aspect ratio for rectangular to square" do
+      # Arrange
+      source_dims = {200, 100}
+      template_dims = {100, 100}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert result == {100.0, 50.0}
+    end
+
+    test "preserves aspect ratio for square to rectangular" do
+      # Arrange
+      source_dims = {100, 100}
+      template_dims = {200, 100}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert result == {100.0, 100.0}
+    end
+
+    test "handles same dimensions" do
+      # Arrange
+      source_dims = {100, 100}
+      template_dims = {100, 100}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert result == {100.0, 100.0}
+    end
+
+    test "handles very different aspect ratios" do
+      # Arrange
+      source_dims = {400, 100}
+      template_dims = {100, 100}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert result == {100.0, 25.0}
+    end
+
+    test "handles float dimensions" do
+      # Arrange
+      source_dims = {100.5, 50.5}
+      template_dims = {50.0, 50.0}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert_in_delta elem(result, 0), 50.0, 0.01
+      assert_in_delta elem(result, 1), 25.12, 0.01
+    end
+
+    test "handles EMU dimensions (English Metric Units)" do
+      # Arrange
+      # 2 inches = 1,828,800 EMUs
+      source_dims = {1_828_800, 1_828_800}
+      # 1 inch = 914,400 EMUs
+      template_dims = {914_400, 914_400}
+
+      # Act
+      result = Image.calculate_scaled_dimensions(source_dims, template_dims)
+
+      # Assert
+      assert result == {914_400.0, 914_400.0}
+    end
+  end
+
+  describe "mime_type_for_extension/1" do
+    test "returns mime type for .png" do
+      # Arrange
+      extension = ".png"
+
+      # Act
+      result = Image.mime_type_for_extension(extension)
+
+      # Assert
+      assert result == "image/png"
+    end
+
+    test "returns mime type for .jpg" do
+      # Arrange
+      extension = ".jpg"
+
+      # Act
+      result = Image.mime_type_for_extension(extension)
+
+      # Assert
+      assert result == "image/jpeg"
+    end
+
+    test "returns mime type for .jpeg" do
+      # Arrange
+      extension = ".jpeg"
+
+      # Act
+      result = Image.mime_type_for_extension(extension)
+
+      # Assert
+      assert result == "image/jpeg"
+    end
+
+    test "returns mime type for .gif" do
+      # Arrange
+      extension = ".gif"
+
+      # Act
+      result = Image.mime_type_for_extension(extension)
+
+      # Assert
+      assert result == "image/gif"
+    end
+
+    test "returns mime type for extension without dot" do
+      # Arrange
+      extension = "png"
+
+      # Act
+      result = Image.mime_type_for_extension(extension)
+
+      # Assert
+      assert result == "image/png"
+    end
+
+    test "handles uppercase extensions" do
+      # Arrange
+      extension = ".PNG"
+
+      # Act
+      result = Image.mime_type_for_extension(extension)
+
+      # Assert
+      assert result == "image/png"
+    end
+
+    test "returns nil for unsupported extension" do
+      # Arrange
+      extension = ".bmp"
+
+      # Act
+      result = Image.mime_type_for_extension(extension)
+
+      # Assert
+      assert result == nil
+    end
+  end
+
+  describe "parse_content_types/1" do
+    test "parses valid content types XML" do
+      # Arrange
+      xml = """
+      <?xml version="1.0"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+        <Default Extension="png" ContentType="image/png"/>
+      </Types>
+      """
+
+      # Act
+      result = Image.parse_content_types(xml)
+
+      # Assert
+      assert {:ok, _parsed} = result
+    end
+
+    test "returns error for invalid XML" do
+      # Arrange
+      xml = "not valid xml <>"
+
+      # Act
+      result = Image.parse_content_types(xml)
+
+      # Assert
+      assert result == {:error, :invalid_xml}
+    end
+
+    test "parses empty Types element" do
+      # Arrange
+      xml = """
+      <?xml version="1.0"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+      </Types>
+      """
+
+      # Act
+      result = Image.parse_content_types(xml)
+
+      # Assert
+      assert {:ok, _parsed} = result
+    end
+  end
+
+  describe "add_content_type/3" do
+    test "adds new content type when extension doesn't exist" do
+      # Arrange
+      xml = """
+      <?xml version="1.0"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+        <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+      </Types>
+      """
+
+      {:ok, types_xml} = Image.parse_content_types(xml)
+
+      # Act
+      result = Image.add_content_type(types_xml, "png", "image/png")
+
+      # Assert
+      xmlElement(content: content) = result
+      default_elements = Enum.filter(content, fn
+        xmlElement(name: :Default) -> true
+        xmlElement(name: name) ->
+          name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
+        _ -> false
+      end)
+
+      assert length(default_elements) == 2
+    end
+
+    test "does not duplicate existing content type" do
+      # Arrange
+      xml = """
+      <?xml version="1.0"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+        <Default Extension="png" ContentType="image/png"/>
+      </Types>
+      """
+
+      {:ok, types_xml} = Image.parse_content_types(xml)
+
+      # Act
+      result = Image.add_content_type(types_xml, "png", "image/png")
+
+      # Assert
+      xmlElement(content: content) = result
+      default_elements = Enum.filter(content, fn
+        xmlElement(name: :Default) -> true
+        xmlElement(name: name) ->
+          name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
+        _ -> false
+      end)
+
+      assert length(default_elements) == 1
+    end
+
+    test "adds multiple different extensions" do
+      # Arrange
+      xml = """
+      <?xml version="1.0"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+      </Types>
+      """
+
+      {:ok, types_xml} = Image.parse_content_types(xml)
+
+      # Act
+      result =
+        types_xml
+        |> Image.add_content_type("png", "image/png")
+        |> Image.add_content_type("jpg", "image/jpeg")
+        |> Image.add_content_type("gif", "image/gif")
+
+      # Assert
+      xmlElement(content: content) = result
+      default_elements = Enum.filter(content, fn
+        xmlElement(name: :Default) -> true
+        xmlElement(name: name) ->
+          name |> Atom.to_string() |> String.split(":") |> List.last() == "Default"
+        _ -> false
+      end)
+
+      assert length(default_elements) == 3
+    end
+  end
+
+  describe "serialize_content_types/1" do
+    test "serializes content types XML to string" do
+      # Arrange
+      xml = """
+      <?xml version="1.0"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+        <Default Extension="png" ContentType="image/png"/>
+      </Types>
+      """
+
+      {:ok, types_xml} = Image.parse_content_types(xml)
+
+      # Act
+      result = Image.serialize_content_types(types_xml)
+
+      # Assert
+      assert is_binary(result)
+      assert result =~ "Types"
+      assert result =~ "Default"
+      assert result =~ "Extension"
+      assert result =~ "png"
+    end
+
+    test "round-trips XML through parse and serialize" do
+      # Arrange
+      original_xml = """
+      <?xml version="1.0"?>
+      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+        <Default Extension="png" ContentType="image/png"/>
+      </Types>
+      """
+
+      # Act
+      {:ok, parsed} = Image.parse_content_types(original_xml)
+      serialized = Image.serialize_content_types(parsed)
+
+      # Assert - can parse the serialized version
+      assert {:ok, _} = Image.parse_content_types(serialized)
+    end
+  end
+
+  describe "embed_image/3" do
+    test "returns error when image file does not exist" do
+      # Arrange
+      archive_path = "test/fixtures/templates/simple_template.docx"
+      image_path = "/nonexistent/path/image.png"
+      media_filename = "image1.png"
+
+      # Act
+      result = Image.embed_image(archive_path, image_path, media_filename)
+
+      # Assert
+      assert {:error, _} = result
+    end
+
+    test "returns error when archive does not exist" do
+      # Arrange
+      archive_path = "/nonexistent/archive.docx"
+      image_path = @test_png_path
+      media_filename = "image1.png"
+
+      # Act
+      result = Image.embed_image(archive_path, image_path, media_filename)
+
+      # Assert
+      assert {:error, _} = result
+    end
+
+    test "successfully embeds image into archive" do
+      # Arrange
+      # Create a copy of the template to test with
+      source_path = "test/fixtures/comprehensive_template.docx"
+      temp_path = "test/fixtures/temp_embed_test.docx"
+      File.cp!(source_path, temp_path)
+
+      image_path = @test_png_path
+      media_filename = "image1.png"
+
+      # Act
+      result = Image.embed_image(temp_path, image_path, media_filename)
+
+      # Assert
+      assert result == :ok
+
+      # Verify the image was added to the archive
+      {:ok, files} = :zip.unzip(to_charlist(temp_path), [:memory])
+      filenames = Enum.map(files, fn {name, _data} -> to_string(name) end)
+      assert "word/media/#{media_filename}" in filenames
+
+      # Cleanup
+      File.rm!(temp_path)
+    end
+  end
 end

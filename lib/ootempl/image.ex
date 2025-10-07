@@ -1,12 +1,15 @@
 defmodule Ootempl.Image do
   @moduledoc """
-  Functions for detecting and validating placeholder images in Word documents.
+  Functions for detecting, validating, and embedding images in Word documents.
 
   This module provides functionality to:
   - Find images with placeholder markers in Word XML
   - Parse placeholder names from alt text markers
   - Validate image files (existence, readability, format)
   - Read image dimensions for aspect ratio calculations
+  - Embed images into .docx archives
+  - Manage content types for image MIME types
+  - Calculate scaled dimensions to fit template bounds
   """
 
   import Record, only: [defrecord: 2, extract: 2]
@@ -181,7 +184,264 @@ defmodule Ootempl.Image do
     ext in [".png", ".jpg", ".jpeg", ".gif"]
   end
 
+  @doc """
+  Embeds an image file into the .docx archive's media folder.
+
+  ## Parameters
+
+    - `archive_path` - Path to the .docx file
+    - `image_path` - Path to the image file to embed
+    - `media_filename` - Filename to use in the word/media/ folder (e.g., "image1.png")
+
+  ## Returns
+
+  - `:ok` on success
+  - `{:error, reason}` on failure
+
+  ## Examples
+
+      iex> Ootempl.Image.embed_image("doc.docx", "/path/to/logo.png", "image1.png")
+      :ok
+  """
+  @spec embed_image(String.t(), String.t(), String.t()) :: :ok | {:error, {atom(), term()}}
+  def embed_image(archive_path, image_path, media_filename) do
+    with {:ok, image_data} <- tag_error(File.read(image_path), :read_image),
+         {:ok, files} <- tag_error(:zip.unzip(to_charlist(archive_path), [:memory]), :unzip_archive),
+         media_path = to_charlist("word/media/#{media_filename}"),
+         updated_files = [{media_path, image_data} | files],
+         {:ok, {_filename, zip_data}} <- tag_error(:zip.zip(to_charlist(archive_path), updated_files, [:memory]), :rezip_archive) do
+      tag_error(File.write(archive_path, zip_data), :write_archive)
+    end
+  end
+
+  @doc """
+  Generates a unique filename for the word/media/ folder.
+
+  Examines existing filenames and generates the next sequential filename.
+
+  ## Parameters
+
+    - `existing_files` - List of existing filenames in word/media/ (e.g., ["image1.png", "image2.jpg"])
+    - `extension` - File extension including the dot (e.g., ".png")
+
+  ## Returns
+
+  A unique filename string (e.g., "image3.png")
+
+  ## Examples
+
+      iex> Ootempl.Image.generate_media_filename(["image1.png", "image2.jpg"], ".png")
+      "image3.png"
+
+      iex> Ootempl.Image.generate_media_filename([], ".png")
+      "image1.png"
+  """
+  @spec generate_media_filename([String.t()], String.t()) :: String.t()
+  def generate_media_filename(existing_files, extension) when is_list(existing_files) and is_binary(extension) do
+    # Extract numbers from existing image filenames
+    numbers =
+      existing_files
+      |> Enum.map(fn filename ->
+        case Regex.run(~r/image(\d+)\./, filename) do
+          [_, num] -> String.to_integer(num)
+          _ -> 0
+        end
+      end)
+
+    next_number = if numbers == [], do: 1, else: Enum.max(numbers) + 1
+    "image#{next_number}#{extension}"
+  end
+
+  @doc """
+  Calculates scaled dimensions to fit template bounds while preserving aspect ratio.
+
+  Uses the smaller scale factor to ensure the image fits within the bounds.
+
+  ## Parameters
+
+    - `source_dims` - Source image dimensions as `{width, height}`
+    - `template_dims` - Template bounds as `{width, height}`
+
+  ## Returns
+
+  Scaled dimensions as `{width, height}`
+
+  ## Examples
+
+      iex> Ootempl.Image.calculate_scaled_dimensions({800, 600}, {400, 400})
+      {400.0, 300.0}
+
+      iex> Ootempl.Image.calculate_scaled_dimensions({100, 100}, {200, 100})
+      {100.0, 100.0}
+  """
+  @spec calculate_scaled_dimensions({number(), number()}, {number(), number()}) :: {float(), float()}
+  def calculate_scaled_dimensions({src_width, src_height}, {template_width, template_height})
+      when is_number(src_width) and is_number(src_height) and
+             is_number(template_width) and is_number(template_height) do
+    width_scale = template_width / src_width
+    height_scale = template_height / src_height
+    scale = min(width_scale, height_scale)
+
+    {src_width * scale, src_height * scale}
+  end
+
+  @doc """
+  Parses the [Content_Types].xml file.
+
+  ## Parameters
+
+    - `xml_string` - The XML content as a string
+
+  ## Returns
+
+  - `{:ok, xml_element}` on successful parse
+  - `{:error, reason}` on parse failure
+
+  ## Examples
+
+      iex> xml = ~s(<?xml version="1.0"?><Types xmlns="..."></Types>)
+      iex> Ootempl.Image.parse_content_types(xml)
+      {:ok, {...}}
+  """
+  @spec parse_content_types(String.t()) :: {:ok, tuple()} | {:error, atom()}
+  def parse_content_types(xml_string) when is_binary(xml_string) do
+    {xml_element, _} = :xmerl_scan.string(to_charlist(xml_string), quiet: true)
+    {:ok, xml_element}
+  catch
+    :exit, _ -> {:error, :invalid_xml}
+  end
+
+  @doc """
+  Adds or updates a content type entry in the content types XML.
+
+  If the extension already has a content type defined, it is not added again.
+
+  ## Parameters
+
+    - `types_xml` - The parsed XML element from parse_content_types/1
+    - `extension` - File extension without the dot (e.g., "png")
+    - `mime_type` - MIME type string (e.g., "image/png")
+
+  ## Returns
+
+  Updated XML element
+
+  ## Examples
+
+      iex> Ootempl.Image.add_content_type(types_xml, "png", "image/png")
+      {...}
+  """
+  @spec add_content_type(tuple(), String.t(), String.t()) :: tuple()
+  def add_content_type(types_xml, extension, mime_type) do
+    xmlElement(content: content) = types_xml
+
+    # Check if extension already exists
+    extension_exists? = extension_already_exists?(content, extension)
+
+    if extension_exists? do
+      types_xml
+    else
+      # Create new Default element
+      new_default =
+        xmlElement(
+          name: :Default,
+          attributes: [
+            xmlAttribute(name: :Extension, value: to_charlist(extension)),
+            xmlAttribute(name: :ContentType, value: to_charlist(mime_type))
+          ]
+        )
+
+      # Add new element to content
+      xmlElement(types_xml, content: content ++ [new_default])
+    end
+  end
+
+  @doc """
+  Serializes the content types XML back to a string.
+
+  ## Parameters
+
+    - `types_xml` - The XML element to serialize
+
+  ## Returns
+
+  XML string
+
+  ## Examples
+
+      iex> Ootempl.Image.serialize_content_types(types_xml)
+      "<?xml version=\\"1.0\\"?>\\n<Types>...</Types>"
+  """
+  @spec serialize_content_types(tuple()) :: String.t()
+  def serialize_content_types(types_xml) do
+    xml_binary = :xmerl.export_simple([types_xml], :xmerl_xml)
+    IO.iodata_to_binary(xml_binary)
+  end
+
+  @doc """
+  Returns the MIME type for a given file extension.
+
+  ## Parameters
+
+    - `extension` - File extension with or without the dot (e.g., ".png" or "png")
+
+  ## Returns
+
+  MIME type string, or `nil` if the extension is not supported
+
+  ## Examples
+
+      iex> Ootempl.Image.mime_type_for_extension(".png")
+      "image/png"
+
+      iex> Ootempl.Image.mime_type_for_extension("jpg")
+      "image/jpeg"
+
+      iex> Ootempl.Image.mime_type_for_extension(".bmp")
+      nil
+  """
+  @spec mime_type_for_extension(String.t()) :: String.t() | nil
+  def mime_type_for_extension(ext) when is_binary(ext) do
+    normalized = ext |> String.downcase() |> String.trim_leading(".")
+
+    case normalized do
+      "png" -> "image/png"
+      "jpg" -> "image/jpeg"
+      "jpeg" -> "image/jpeg"
+      "gif" -> "image/gif"
+      _ -> nil
+    end
+  end
+
   # Private helper functions
+
+  defp tag_error({:ok, val}, _tag), do: {:ok, val}
+  defp tag_error(:ok, _tag), do: :ok
+  defp tag_error({:error, reason}, tag), do: {:error, {tag, reason}}
+
+  defp extension_already_exists?(content, extension) do
+    Enum.any?(content, fn
+      xmlElement(name: name, attributes: attrs) ->
+        local_name = name |> Atom.to_string() |> String.split(":") |> List.last()
+        local_name == "Default" and extension_matches?(attrs, extension)
+
+      _ ->
+        false
+    end)
+  end
+
+  defp extension_matches?(attrs, extension) do
+    ext_attr =
+      Enum.find(attrs, fn
+        xmlAttribute(name: name) -> Atom.to_string(name) == "Extension"
+        _ -> false
+      end)
+
+    case ext_attr do
+      xmlAttribute(value: value) -> to_string(value) == extension
+      _ -> false
+    end
+  end
 
   defp find_elements_by_path(xml_element, path) do
     case xml_element do
