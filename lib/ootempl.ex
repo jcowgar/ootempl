@@ -386,10 +386,12 @@ defmodule Ootempl do
   alias Ootempl.Archive
   alias Ootempl.Conditional
   alias Ootempl.Image
+  alias Ootempl.Placeholder
   alias Ootempl.Relationships
   alias Ootempl.Replacement
   alias Ootempl.Table
   alias Ootempl.Template
+  alias Ootempl.TemplateInfo
   alias Ootempl.Validator
   alias Ootempl.Xml
   alias Ootempl.Xml.Normalizer
@@ -544,6 +546,139 @@ defmodule Ootempl do
   end
 
   @doc """
+  Inspects a template to discover placeholders, conditionals, and validate syntax.
+
+  This function analyzes a template without performing any data replacement. It
+  returns detailed information about:
+  - All variable placeholders found in the template
+  - All conditional markers (`@if:@`, `@else@`, `@endif@`)
+  - Required top-level data keys
+  - Syntax validation errors (unclosed conditionals, malformed placeholders, etc.)
+
+  This is useful for:
+  - **Template discovery** - Finding what data fields a template requires
+  - **Validation** - Checking template syntax before rendering
+  - **Documentation** - Generating documentation about template requirements
+  - **Dynamic UIs** - Building forms based on template placeholders
+  - **Debugging** - Understanding template structure and errors
+
+  ## Parameters
+
+  - `template` - Either:
+    - A file path (String) to a .docx template - loads and inspects in one call
+    - A `%Template{}` struct from `Ootempl.load/1` - faster for batch operations
+
+  ## Returns
+
+  - `{:ok, %TemplateInfo{}}` with inspection results
+  - `{:error, term()}` for invalid files or structural errors
+
+  ## Examples
+
+      ### Single Template (Convenience)
+
+      # Inspect a contract template
+      {:ok, info} = Ootempl.inspect("contract_template.docx")
+
+      # Check if template is valid
+      if info.valid? do
+        IO.puts("✓ Template is valid")
+      else
+        IO.puts("✗ Found \#{length(info.errors)} errors")
+        Enum.each(info.errors, fn err ->
+          IO.puts("  - [\#{err.type}] \#{err.message}")
+        end)
+      end
+
+      # Discover required data keys
+      IO.puts("Required data keys: \#{Enum.join(info.required_keys, ", ")}")
+      #=> Required data keys: customer, total, items
+
+      ### Batch Inspection (Optimized)
+
+      # Load template once
+      {:ok, template} = Ootempl.load("invoice_template.docx")
+
+      # Inspect the same template multiple times (fast - no I/O)
+      templates = ["v1.docx", "v2.docx", "v3.docx"]
+      Enum.each(templates, fn path ->
+        {:ok, tmpl} = Ootempl.load(path)
+        {:ok, info} = Ootempl.inspect(tmpl)
+        IO.puts("\#{path}: \#{length(info.placeholders)} placeholders")
+      end)
+
+      ### Placeholder Details
+
+      # List all placeholders
+      Enum.each(info.placeholders, fn ph ->
+        IO.puts("Placeholder: \#{ph.original}")
+        IO.puts("  Path: \#{Enum.join(ph.path, ".")}")
+        IO.puts("  Found in: \#{inspect(ph.locations)}")
+      end)
+      #=> Placeholder: @customer.name@
+      #     Path: customer.name
+      #     Found in: [:document_body, :header1]
+
+      # List conditionals
+      Enum.each(info.conditionals, fn cond ->
+        IO.puts("Conditional: @if:\#{cond.condition}@")
+        IO.puts("  Path: \#{Enum.join(cond.path, ".")}")
+      end)
+      #=> Conditional: @if:show_disclaimer@
+      #     Path: show_disclaimer
+
+  ## Detectable Errors
+
+  - **Unclosed conditionals** - `@if:condition@` without matching `@endif@`
+  - **Orphan markers** - `@endif@` or `@else@` without matching `@if:@`
+  - **Nested conditionals** - Conditional blocks inside other blocks (not supported)
+  - **Malformed placeholders** - Invalid placeholder syntax
+  - **Invalid conditional syntax** - Empty conditions, missing trailing `@`
+
+  ## Template Coverage
+
+  Scans all parts of the document:
+  - Document body
+  - Headers (header1.xml, header2.xml, header3.xml)
+  - Footers (footer1.xml, footer2.xml, footer3.xml)
+  - Footnotes
+  - Endnotes
+  - Document properties (core.xml, app.xml)
+
+  ## Limitations
+
+  - Cannot determine if placeholders are in table template rows (requires data shape)
+  - Does not validate whether data would satisfy placeholders (use `validate/2` for that)
+  - Deduplicates placeholders across locations (same placeholder reported once)
+  """
+  @spec inspect(Path.t() | Template.t()) :: {:ok, TemplateInfo.t()} | {:error, term()}
+  def inspect(template)
+
+  # Pattern 1: Inspect from pre-loaded Template struct (optimized)
+  def inspect(%Template{} = template) do
+    inspect_from_template(template)
+  end
+
+  # Pattern 2: Inspect from file path (convenience API)
+  def inspect(template_path) when is_binary(template_path) do
+    with :ok <- Validator.validate_docx(template_path),
+         {:ok, temp_dir} <- Archive.extract(template_path) do
+      # Inspect template and always cleanup temp directory
+      result = inspect_template_in_temp_dir(temp_dir)
+      cleanup_result = Archive.cleanup(temp_dir)
+
+      # Return original result or cleanup error
+      case {result, cleanup_result} do
+        {{:ok, info}, :ok} -> {:ok, info}
+        {{:ok, _info}, {:error, _} = cleanup_error} -> cleanup_error
+        {error, _} -> error
+      end
+    else
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc """
   Renders a .docx template with data to generate an output document.
 
   This function accepts either a template file path (String) or a pre-loaded
@@ -661,6 +796,323 @@ defmodule Ootempl do
   end
 
   # Private functions
+
+  # Inspects template from pre-loaded Template struct
+  @spec inspect_from_template(Template.t()) :: {:ok, TemplateInfo.t()}
+  defp inspect_from_template(template) do
+    # Collect XML elements to inspect with their locations
+    xml_elements = [
+      {template.document, :document_body}
+    ]
+
+    # Add headers
+    header_elements =
+      template.headers
+      |> Enum.map(fn {filename, xml} ->
+        # Extract number from filename (e.g., "word/header1.xml" -> 1)
+        number =
+          filename
+          |> Path.basename(".xml")
+          |> String.replace(~r/[^\d]/, "")
+          |> String.to_integer()
+
+        location = String.to_atom("header#{number}")
+        {xml, location}
+      end)
+
+    # Add footers
+    footer_elements =
+      template.footers
+      |> Enum.map(fn {filename, xml} ->
+        number =
+          filename
+          |> Path.basename(".xml")
+          |> String.replace(~r/[^\d]/, "")
+          |> String.to_integer()
+
+        location = String.to_atom("footer#{number}")
+        {xml, location}
+      end)
+
+    # Add optional elements
+    optional_elements =
+      [
+        {template.footnotes, :footnotes},
+        {template.endnotes, :endnotes},
+        {template.core_properties, :properties},
+        {template.app_properties, :properties}
+      ]
+      |> Enum.reject(fn {xml, _location} -> is_nil(xml) end)
+
+    all_elements = xml_elements ++ header_elements ++ footer_elements ++ optional_elements
+
+    # Inspect each XML element
+    file_inspections =
+      Enum.map(all_elements, fn {xml, location} ->
+        text = extract_all_text_from_doc(xml)
+
+        # Detect placeholders and conditionals
+        placeholders = Placeholder.detect(text)
+        conditionals = Conditional.detect_conditionals(text)
+
+        # Validate conditionals
+        validation_errors = validate_conditional_syntax(conditionals)
+
+        %{
+          location: location,
+          placeholders: placeholders,
+          conditionals: conditionals,
+          errors: validation_errors
+        }
+      end)
+
+    # Build TemplateInfo from inspections
+    build_template_info(file_inspections)
+  end
+
+  # Inspects template in temp directory and returns TemplateInfo struct
+  @spec inspect_template_in_temp_dir(Path.t()) :: {:ok, TemplateInfo.t()} | {:error, term()}
+  defp inspect_template_in_temp_dir(temp_dir) do
+    # Define which files to inspect
+    files_to_inspect = [
+      {"word/document.xml", :document_body},
+      {"word/footnotes.xml", :footnotes},
+      {"word/endnotes.xml", :endnotes},
+      {"docProps/core.xml", :properties},
+      {"docProps/app.xml", :properties}
+    ]
+
+    # Find header and footer files
+    header_files = find_xml_files_with_location(temp_dir, "word/header*.xml", :header)
+    footer_files = find_xml_files_with_location(temp_dir, "word/footer*.xml", :footer)
+
+    all_files = files_to_inspect ++ header_files ++ footer_files
+
+    # Inspect each file and collect results
+    case inspect_all_files(temp_dir, all_files) do
+      {:ok, file_inspections} ->
+        # Aggregate results into TemplateInfo
+        build_template_info(file_inspections)
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  # Finds XML files matching a pattern and assigns them location identifiers
+  @spec find_xml_files_with_location(Path.t(), String.t(), :header | :footer) ::
+          [{String.t(), TemplateInfo.location()}]
+  defp find_xml_files_with_location(temp_dir, pattern, type) do
+    temp_dir
+    |> Path.join(pattern)
+    |> Path.wildcard()
+    |> Enum.map(fn file_path ->
+      relative_path = Path.relative_to(file_path, temp_dir)
+      # Extract number from filename (e.g., header1.xml -> 1)
+      number =
+        file_path
+        |> Path.basename(".xml")
+        |> String.replace(~r/[^\d]/, "")
+        |> String.to_integer()
+
+      location =
+        case type do
+          :header -> String.to_atom("header#{number}")
+          :footer -> String.to_atom("footer#{number}")
+        end
+
+      {relative_path, location}
+    end)
+  end
+
+  # Inspects all files and returns list of file inspection results
+  @spec inspect_all_files(Path.t(), [{String.t(), TemplateInfo.location()}]) ::
+          {:ok, [map()]} | {:error, term()}
+  defp inspect_all_files(temp_dir, files) do
+    results =
+      Enum.reduce_while(files, {:ok, []}, fn file_info, {:ok, acc} ->
+        inspect_file_if_exists(temp_dir, file_info, acc)
+      end)
+
+    case results do
+      {:ok, inspections} -> {:ok, Enum.reverse(inspections)}
+      error -> error
+    end
+  end
+
+  # Helper to inspect a file if it exists
+  @spec inspect_file_if_exists(Path.t(), {String.t(), TemplateInfo.location()}, [map()]) ::
+          {:cont, {:ok, [map()]}} | {:halt, {:error, term()}}
+  defp inspect_file_if_exists(temp_dir, {relative_path, location}, acc) do
+    file_path = Path.join(temp_dir, relative_path)
+
+    if File.exists?(file_path) do
+      case inspect_single_file(file_path, location) do
+        {:ok, inspection} -> {:cont, {:ok, [inspection | acc]}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    else
+      # File doesn't exist - skip it
+      {:cont, {:ok, acc}}
+    end
+  end
+
+  # Inspects a single XML file
+  @spec inspect_single_file(Path.t(), TemplateInfo.location()) ::
+          {:ok, map()} | {:error, term()}
+  defp inspect_single_file(file_path, location) do
+    with {:ok, xml_content} <- File.read(file_path),
+         {:ok, xml_doc} <- Xml.parse(xml_content) do
+      normalized_doc = Normalizer.normalize(xml_doc)
+      text = extract_all_text_from_doc(normalized_doc)
+
+      # Detect placeholders and conditionals
+      placeholders = Placeholder.detect(text)
+      conditionals = Conditional.detect_conditionals(text)
+
+      # Validate conditionals
+      validation_errors = validate_conditional_syntax(conditionals)
+
+      {:ok,
+       %{
+         location: location,
+         placeholders: placeholders,
+         conditionals: conditionals,
+         errors: validation_errors
+       }}
+    else
+      {:error, reason} -> {:error, {:inspect_file_failed, file_path, reason}}
+    end
+  end
+
+  # Validates conditional syntax and returns list of errors
+  @spec validate_conditional_syntax([Conditional.conditional()]) :: [TemplateInfo.error_info()]
+  defp validate_conditional_syntax(conditionals) do
+    case Conditional.validate_pairs(conditionals) do
+      :ok ->
+        []
+
+      {:error, message} ->
+        # Parse error message to determine error type
+        error_type =
+          cond do
+            String.contains?(message, "Unmatched @if") -> :unclosed_conditional
+            String.contains?(message, "Orphan") -> :unclosed_conditional
+            String.contains?(message, "Multiple @else@") -> :invalid_conditional_syntax
+            true -> :invalid_conditional_syntax
+          end
+
+        [%{type: error_type, message: message, location: nil}]
+    end
+  end
+
+  # Builds TemplateInfo struct from file inspection results
+  @spec build_template_info([map()]) :: {:ok, TemplateInfo.t()}
+  defp build_template_info(file_inspections) do
+    # Aggregate placeholders across all files
+    all_placeholders =
+      file_inspections
+      |> Enum.flat_map(fn inspection ->
+        Enum.map(inspection.placeholders, fn ph ->
+          Map.put(ph, :location, inspection.location)
+        end)
+      end)
+
+    # Deduplicate placeholders and collect locations
+    deduplicated_placeholders = deduplicate_placeholders(all_placeholders)
+
+    # Aggregate conditionals across all files
+    all_conditionals =
+      file_inspections
+      |> Enum.flat_map(fn inspection ->
+        # Only keep :if conditionals for the summary (not :else or :endif)
+        inspection.conditionals
+        |> Enum.filter(&(&1.type == :if))
+        |> Enum.map(fn cond ->
+          %{
+            condition: cond.condition,
+            path: cond.path,
+            location: inspection.location
+          }
+        end)
+      end)
+
+    # Deduplicate conditionals
+    deduplicated_conditionals = deduplicate_conditionals(all_conditionals)
+
+    # Extract required keys (first segment of each placeholder path)
+    required_keys =
+      deduplicated_placeholders
+      |> Enum.map(& &1.path)
+      |> Enum.map(&List.first/1)
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    # Collect all errors
+    all_errors =
+      file_inspections
+      |> Enum.flat_map(& &1.errors)
+
+    # Determine validity
+    valid? = Enum.empty?(all_errors)
+
+    info = %TemplateInfo{
+      valid?: valid?,
+      placeholders: deduplicated_placeholders,
+      conditionals: deduplicated_conditionals,
+      required_keys: required_keys,
+      errors: all_errors
+    }
+
+    {:ok, info}
+  end
+
+  # Deduplicates placeholders by combining locations for the same placeholder
+  @spec deduplicate_placeholders([map()]) :: [TemplateInfo.placeholder_info()]
+  defp deduplicate_placeholders(placeholders) do
+    placeholders
+    |> Enum.group_by(& &1.original)
+    |> Enum.map(fn {_original, group} ->
+      # Take the first one as the template
+      first = List.first(group)
+      # Collect all unique locations
+      locations =
+        group
+        |> Enum.map(& &1.location)
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      %{
+        original: first.original,
+        path: first.path,
+        locations: locations
+      }
+    end)
+    |> Enum.sort_by(& &1.original)
+  end
+
+  # Deduplicates conditionals by combining locations for the same condition
+  @spec deduplicate_conditionals([map()]) :: [TemplateInfo.conditional_info()]
+  defp deduplicate_conditionals(conditionals) do
+    conditionals
+    |> Enum.group_by(& &1.condition)
+    |> Enum.map(fn {_condition, group} ->
+      first = List.first(group)
+
+      locations =
+        group
+        |> Enum.map(& &1.location)
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      %{
+        condition: first.condition,
+        path: first.path,
+        locations: locations
+      }
+    end)
+    |> Enum.sort_by(& &1.condition)
+  end
 
   # Validates template in temp directory without creating output file
   @spec validate_template_in_temp_dir(Path.t(), map()) :: :ok | {:error, term()}
