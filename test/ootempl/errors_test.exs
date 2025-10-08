@@ -189,7 +189,7 @@ defmodule Ootempl.ErrorsTest do
     test "creates exception with single placeholder" do
       # Arrange
       placeholders = [
-        %{placeholder: "@name@", reason: {:path_not_found, ["name"]}}
+        %{placeholder: "{{name}}", reason: {:path_not_found, ["name"]}}
       ]
 
       # Act
@@ -198,15 +198,15 @@ defmodule Ootempl.ErrorsTest do
       # Assert
       assert %PlaceholderError{} = exception
       assert exception.placeholders == placeholders
-      assert exception.message =~ "Placeholder @name@ could not be resolved"
+      assert exception.message =~ "Placeholder {{name}} could not be resolved"
     end
 
     test "creates exception with multiple placeholders" do
       # Arrange
       placeholders = [
-        %{placeholder: "@name@", reason: {:path_not_found, ["name"]}},
-        %{placeholder: "@email@", reason: {:path_not_found, ["email"]}},
-        %{placeholder: "@age@", reason: :nil_value}
+        %{placeholder: "{{name}}", reason: {:path_not_found, ["name"]}},
+        %{placeholder: "{{email}}", reason: {:path_not_found, ["email"]}},
+        %{placeholder: "{{age}}", reason: :nil_value}
       ]
 
       # Act
@@ -216,7 +216,7 @@ defmodule Ootempl.ErrorsTest do
       assert %PlaceholderError{} = exception
       assert exception.placeholders == placeholders
       assert exception.message =~ "3 placeholders could not be resolved"
-      assert exception.message =~ "@name@"
+      assert exception.message =~ "{{name}}"
     end
 
     test "creates exception with empty placeholder list" do
@@ -235,11 +235,11 @@ defmodule Ootempl.ErrorsTest do
     test "preserves all error reasons" do
       # Arrange
       placeholders = [
-        %{placeholder: "@missing@", reason: {:path_not_found, ["missing"]}},
-        %{placeholder: "@ambiguous@", reason: {:ambiguous_key, "name", ["Name", "name"]}},
-        %{placeholder: "@nil@", reason: :nil_value},
-        %{placeholder: "@bad_index@", reason: {:invalid_index, "abc"}},
-        %{placeholder: "@oob@", reason: {:index_out_of_bounds, 5, 3}}
+        %{placeholder: "{{missing}}", reason: {:path_not_found, ["missing"]}},
+        %{placeholder: "{{ambiguous}}", reason: {:ambiguous_key, "name", ["Name", "name"]}},
+        %{placeholder: "{{nil}}", reason: :nil_value},
+        %{placeholder: "{{bad_index}}", reason: {:invalid_index, "abc"}},
+        %{placeholder: "{{oob}}", reason: {:index_out_of_bounds, 5, 3}}
       ]
 
       # Act
@@ -253,7 +253,7 @@ defmodule Ootempl.ErrorsTest do
 
     test "can be raised" do
       # Arrange
-      placeholders = [%{placeholder: "@test@", reason: :nil_value}]
+      placeholders = [%{placeholder: "{{test}}", reason: :nil_value}]
 
       # Act & Assert
       assert_raise PlaceholderError, fn ->

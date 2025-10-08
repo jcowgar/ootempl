@@ -157,6 +157,7 @@ defmodule OotemplTest do
           |> Enum.map(fn
             {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
           end)
+          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
           |> Enum.sort()
         after
           :zip.zip_close(zip_handle)
@@ -180,6 +181,7 @@ defmodule OotemplTest do
           |> Enum.map(fn
             {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
           end)
+          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
           |> Enum.sort()
         after
           :zip.zip_close(zip_handle)
@@ -500,10 +502,10 @@ defmodule OotemplTest do
         <?xml version="1.0"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>Customer: @customer.name@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Email: @customer.email@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>City: @customer.address.city@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>State: @customer.address.state@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Customer: {{customer.name}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Email: {{customer.email}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>City: {{customer.address.city}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>State: {{customer.address.state}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,
@@ -549,8 +551,8 @@ defmodule OotemplTest do
         <?xml version="1.0"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>Name: @customer.Name@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Email: @customer.EMAIL@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Name: {{customer.Name}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Email: {{customer.EMAIL}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,
@@ -593,8 +595,8 @@ defmodule OotemplTest do
         <?xml version="1.0"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>First: @customers.0.name@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Second: @customers.1.name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>First: {{customers.0.name}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Second: {{customers.1.name}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,
@@ -638,8 +640,8 @@ defmodule OotemplTest do
         <?xml version="1.0"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>Name: @customer.name@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Address: @customer.address@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Name: {{customer.name}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Address: {{customer.address}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,
@@ -682,9 +684,9 @@ defmodule OotemplTest do
         <?xml version="1.0"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>Customer: @customer.name@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Order ID: @order_id@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Status: @metadata.status@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Customer: {{customer.name}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Order ID: {{order_id}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Status: {{metadata.status}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,
@@ -943,7 +945,7 @@ defmodule OotemplTest do
   end
 
   describe "conditional edge cases" do
-    test "handles document with unmatched @if@ markers" do
+    test "handles document with unmatched {{if}} markers" do
       # Arrange
       template_path = @test_fixture
       # Data that would make condition true, but markers are malformed in template
@@ -1245,10 +1247,10 @@ defmodule OotemplTest do
         <?xml version="1.0"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>@if:show_section@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>{{if show_section}}</w:t></w:r></w:p>
             <w:p><w:r><w:t>This section is shown when show_section is true</w:t></w:r></w:p>
-            <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Name: @name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Name: {{name}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,
@@ -1278,10 +1280,10 @@ defmodule OotemplTest do
         <?xml version="1.0"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>@if:show_section@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>{{if show_section}}</w:t></w:r></w:p>
             <w:p><w:r><w:t>Hidden content</w:t></w:r></w:p>
-            <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Name: @name@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Name: {{name}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,

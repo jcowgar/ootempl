@@ -1439,8 +1439,8 @@ defmodule Ootempl do
         ) :: {:ok, Xml.xml_element()} | {:error, term()}
   defp remove_conditional_markers_and_else_section(xml_doc, %{if: if_marker, else: nil, endif: _endif_marker}) do
     # No else section: just remove the if and endif markers
-    if_marker_text = "@if:#{if_marker.condition}@"
-    endif_marker_text = "@endif@"
+    if_marker_text = "{{if #{if_marker.condition}}}"
+    endif_marker_text = "{{endif}}"
 
     case Conditional.find_section_boundaries(xml_doc, if_marker_text, endif_marker_text) do
       {:ok, {start_para, end_para}} ->
@@ -1454,9 +1454,9 @@ defmodule Ootempl do
 
   defp remove_conditional_markers_and_else_section(xml_doc, %{if: if_marker, else: _else_marker, endif: _endif_marker}) do
     # Has else section: remove if marker, remove entire else section through endif
-    if_marker_text = "@if:#{if_marker.condition}@"
-    else_marker_text = "@else@"
-    endif_marker_text = "@endif@"
+    if_marker_text = "{{if #{if_marker.condition}}}"
+    else_marker_text = "{{else}}"
+    endif_marker_text = "{{endif}}"
 
     with {:ok, if_para} <- find_paragraph(xml_doc, if_marker_text),
          {:ok, {else_para, endif_para}} <-
@@ -1479,8 +1479,8 @@ defmodule Ootempl do
         ) :: {:ok, Xml.xml_element()} | {:error, term()}
   defp remove_if_section_keep_else(xml_doc, if_marker, nil, _endif_marker) do
     # No else section: remove entire if/endif section
-    if_marker_text = "@if:#{if_marker.condition}@"
-    endif_marker_text = "@endif@"
+    if_marker_text = "{{if #{if_marker.condition}}}"
+    endif_marker_text = "{{endif}}"
 
     case Conditional.find_section_boundaries(xml_doc, if_marker_text, endif_marker_text) do
       {:ok, {start_para, end_para}} ->
@@ -1502,9 +1502,9 @@ defmodule Ootempl do
 
   defp remove_if_section_keep_else(xml_doc, if_marker, _else_marker, _endif_marker) do
     # Has else section: remove if section through else, remove else and endif markers
-    if_marker_text = "@if:#{if_marker.condition}@"
-    else_marker_text = "@else@"
-    endif_marker_text = "@endif@"
+    if_marker_text = "{{if #{if_marker.condition}}}"
+    else_marker_text = "{{else}}"
+    endif_marker_text = "{{endif}}"
 
     with {:ok, {if_para, else_para}} <- Conditional.find_section_boundaries(xml_doc, if_marker_text, else_marker_text),
          {:ok, endif_para} <- find_paragraph(xml_doc, endif_marker_text),

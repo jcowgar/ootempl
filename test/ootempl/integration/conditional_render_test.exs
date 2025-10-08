@@ -46,8 +46,8 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert output_xml =~ "Before conditional"
       assert output_xml =~ "After conditional"
       refute output_xml =~ "Conditional content that should appear or disappear"
-      refute output_xml =~ "@if:show_section@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if show_section}}"
+      refute output_xml =~ "{{endif}}"
     end
 
     test "keeps section and removes markers when condition is true" do
@@ -73,8 +73,8 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert output_xml =~ "Before conditional"
       assert output_xml =~ "Conditional content that should appear or disappear"
       assert output_xml =~ "After conditional"
-      refute output_xml =~ "@if:show_section@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if show_section}}"
+      refute output_xml =~ "{{endif}}"
     end
 
     test "handles truthiness correctly with zero" do
@@ -174,8 +174,8 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       refute output_xml =~ "DISCLAIMER PARAGRAPH 1"
       refute output_xml =~ "DISCLAIMER PARAGRAPH 2"
       refute output_xml =~ "DISCLAIMER PARAGRAPH 3"
-      refute output_xml =~ "@if:show_disclaimer@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if show_disclaimer}}"
+      refute output_xml =~ "{{endif}}"
     end
 
     test "keeps all paragraphs in section when condition is true" do
@@ -201,8 +201,8 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert output_xml =~ "DISCLAIMER PARAGRAPH 2"
       assert output_xml =~ "DISCLAIMER PARAGRAPH 3"
       assert output_xml =~ "Document end"
-      refute output_xml =~ "@if:show_disclaimer@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if show_disclaimer}}"
+      refute output_xml =~ "{{endif}}"
     end
   end
 
@@ -231,7 +231,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       refute output_xml =~ "Second conditional content"
       assert output_xml =~ "End"
       refute output_xml =~ "@if:"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{endif}}"
     end
 
     test "handles all conditionals true" do
@@ -302,8 +302,8 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       refute output_xml =~ "Product A"
       refute output_xml =~ "$100"
       refute output_xml =~ "<w:tbl"
-      refute output_xml =~ "@if:show_pricing@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if show_pricing}}"
+      refute output_xml =~ "{{endif}}"
     end
 
     test "keeps table when condition is true" do
@@ -329,8 +329,8 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert output_xml =~ "$100"
       assert output_xml =~ "<w:tbl"
       assert output_xml =~ "After table"
-      refute output_xml =~ "@if:show_pricing@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if show_pricing}}"
+      refute output_xml =~ "{{endif}}"
     end
   end
 
@@ -348,10 +348,10 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
           <w:body>
-            <w:p><w:r><w:t>Hello @name@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>@if:show_message@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>Message: @message@</w:t></w:r></w:p>
-            <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Hello {{name}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>{{if show_message}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Message: {{message}}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
           </w:body>
         </w:document>
         """,
@@ -372,8 +372,8 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Hello Alice"
       refute output_xml =~ "Message: Secret"
-      refute output_xml =~ "@message@"
-      refute output_xml =~ "@if:show_message@"
+      refute output_xml =~ "{{message}}"
+      refute output_xml =~ "{{if show_message}}"
     end
   end
 
@@ -402,9 +402,9 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       assert output_xml =~ "Thank you for being a premium member! You get 20% off."
       refute output_xml =~ "Become a premium member today for 20% off all purchases."
       assert output_xml =~ "Thank you!"
-      refute output_xml =~ "@if:is_premium@"
-      refute output_xml =~ "@else@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if is_premium}}"
+      refute output_xml =~ "{{else}}"
+      refute output_xml =~ "{{endif}}"
     end
 
     test "shows else section when condition is false" do
@@ -431,9 +431,9 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
       refute output_xml =~ "Thank you for being a premium member! You get 20% off."
       assert output_xml =~ "Become a premium member today for 20% off all purchases."
       assert output_xml =~ "Thank you!"
-      refute output_xml =~ "@if:is_premium@"
-      refute output_xml =~ "@else@"
-      refute output_xml =~ "@endif@"
+      refute output_xml =~ "{{if is_premium}}"
+      refute output_xml =~ "{{else}}"
+      refute output_xml =~ "{{endif}}"
     end
 
     test "handles falsy values correctly in if/else" do

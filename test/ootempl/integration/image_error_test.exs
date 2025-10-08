@@ -161,7 +161,7 @@ defmodule Ootempl.Integration.ImageErrorTest do
 
   defp create_image_placeholder_docx(path, placeholder_name) do
     # Create minimal .docx with an image placeholder
-    # Image placeholders use the format @image:name@
+    # Image placeholders use the format {{image:name}}
     document_xml = """
     <?xml version="1.0" encoding="UTF-8"?>
     <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -174,7 +174,7 @@ defmodule Ootempl.Integration.ImageErrorTest do
           <w:r>
             <w:drawing>
               <wp:inline>
-                <wp:docPr name="Picture 1" descr="@image:#{placeholder_name}@"/>
+                <wp:docPr name="Picture 1" descr="{{image:#{placeholder_name}}}"/>
                 <a:graphic>
                   <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
                     <pic:pic>

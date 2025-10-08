@@ -55,7 +55,7 @@ defmodule OotemplTestHelpers do
               <w:drawing>
                 <wp:inline>
                   <wp:extent cx="914400" cy="914400"/>
-                  <wp:docPr descr="@image:#{image_name}@"/>
+                  <wp:docPr descr="{{image:#{image_name}}}"/>
                   <a:graphic>
                     <a:graphicData>
                       <pic:pic>

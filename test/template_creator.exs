@@ -49,7 +49,7 @@ defmodule TemplateCreator do
               <wp:inline distT="0" distB="0" distL="0" distR="0">
                 <wp:extent cx="2000000" cy="1500000"/>
                 <wp:effectExtent l="0" t="0" r="0" b="0"/>
-                <wp:docPr id="1" name="Image 1" descr="@image:logo@"/>
+                <wp:docPr id="1" name="Image 1" descr="{{image:logo}}"/>
                 <wp:cNvGraphicFramePr>
                   <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
                 </wp:cNvGraphicFramePr>
@@ -162,7 +162,7 @@ defmodule TemplateCreator do
               <wp:inline distT="0" distB="0" distL="0" distR="0">
                 <wp:extent cx="2000000" cy="1500000"/>
                 <wp:effectExtent l="0" t="0" r="0" b="0"/>
-                <wp:docPr id="1" name="Image 1" descr="@image:logo@"/>
+                <wp:docPr id="1" name="Image 1" descr="{{image:logo}}"/>
                 <wp:cNvGraphicFramePr>
                   <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
                 </wp:cNvGraphicFramePr>
@@ -195,7 +195,7 @@ defmodule TemplateCreator do
               <wp:inline distT="0" distB="0" distL="0" distR="0">
                 <wp:extent cx="1500000" cy="1500000"/>
                 <wp:effectExtent l="0" t="0" r="0" b="0"/>
-                <wp:docPr id="2" name="Image 2" descr="@image:photo@"/>
+                <wp:docPr id="2" name="Image 2" descr="{{image:photo}}"/>
                 <wp:cNvGraphicFramePr>
                   <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
                 </wp:cNvGraphicFramePr>
@@ -294,7 +294,7 @@ defmodule TemplateCreator do
               <wp:inline distT="0" distB="0" distL="0" distR="0">
                 <wp:extent cx="1800000" cy="1800000"/>
                 <wp:effectExtent l="0" t="0" r="0" b="0"/>
-                <wp:docPr id="1" name="Logo" descr="@image:company_logo@"/>
+                <wp:docPr id="1" name="Logo" descr="{{image:company_logo}}"/>
                 <wp:cNvGraphicFramePr>
                   <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
                 </wp:cNvGraphicFramePr>

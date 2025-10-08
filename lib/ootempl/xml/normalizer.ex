@@ -11,16 +11,16 @@ defmodule Ootempl.Xml.Normalizer do
 
   Fragmented placeholder:
   ```xml
-  <w:r><w:t>Hello @</w:t></w:r>
+  <w:r><w:t>Hello {{</w:t></w:r>
   <w:proofErr w:type="gramStart"/>
   <w:r><w:t>person.first</w:t></w:r>
   <w:proofErr w:type="gramEnd"/>
-  <w:r><w:t>_name@, how are you?</w:t></w:r>
+  <w:r><w:t>_name}}, how are you?</w:t></w:r>
   ```
 
   After normalization:
   ```xml
-  <w:r><w:t>Hello @person.first_name@, how are you?</w:t></w:r>
+  <w:r><w:t>Hello {{person.first_name}}, how are you?</w:t></w:r>
   ```
 
   ## Usage
@@ -241,9 +241,9 @@ defmodule Ootempl.Xml.Normalizer do
   # Check if text might be building toward a placeholder
   @spec potentially_building_placeholder?(String.t()) :: boolean()
   defp potentially_building_placeholder?(text) do
-    # If text contains @ and we haven't found a complete placeholder yet, keep scanning
-    # Look for @ that might be the start of a placeholder
-    String.contains?(text, "@")
+    # If text contains {{ and we haven't found a complete placeholder yet, keep scanning
+    # Look for {{ that might be the start of a placeholder
+    String.contains?(text, "{{") or String.contains?(text, "{")
   end
 
   @spec element_node?(Ootempl.Xml.xml_node()) :: boolean()

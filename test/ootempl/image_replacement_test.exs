@@ -143,7 +143,7 @@ defmodule Ootempl.ImageReplacementTest do
       assert error.placeholder_name == "logo"
       assert error.image_path == nil
       assert error.reason == :image_not_found_in_data
-      assert error.message =~ "Image placeholder '@image:logo@' has no corresponding data key 'logo'"
+      assert error.message =~ "Image placeholder '{{image:logo}}' has no corresponding data key 'logo'"
     end
 
     @tag :tmp_dir
@@ -313,7 +313,7 @@ defmodule Ootempl.ImageReplacementTest do
       # Template uses @name@ which maps to "Alice Johnson"
       assert doc_str =~ "Alice"
       # Verify the variable placeholder was processed (not in text)
-      refute doc_str =~ "@name@"
+      refute doc_str =~ "{{name}}"
       # Note: @image:company_logo@ appears in alt text (descr attribute), not in document text
 
       # Verify image was embedded

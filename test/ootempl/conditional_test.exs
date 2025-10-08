@@ -10,94 +10,94 @@ defmodule Ootempl.ConditionalTest do
   doctest Conditional
 
   describe "detect_conditionals/1" do
-    test "detects @if:variable@ markers" do
+    test "detects {{if variable}} markers" do
       # Arrange
-      text = "Hello @if:name@ world"
+      text = "Hello {{if name}} world"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :if, condition: "name", path: ["name"], position: 6}] = result
+      assert [%{type: :if, condition: "name", path: ["name"]}] = result
     end
 
-    test "detects @endif@ markers" do
+    test "detects {{endif}} markers" do
       # Arrange
-      text = "Hello @endif@ world"
+      text = "Hello {{endif}} world"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :endif, condition: nil, path: nil, position: 6}] = result
+      assert [%{type: :endif, condition: nil, path: nil}] = result
     end
 
-    test "detects both @if@ and @endif@ markers in order" do
+    test "detects both {{if}} and {{endif}} markers in order" do
       # Arrange
-      text = "@if:active@content@endif@"
+      text = "{{if active}}content{{endif}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
       assert [
-               %{type: :if, condition: "active", path: ["active"], position: 0},
-               %{type: :endif, condition: nil, path: nil, position: 18}
+               %{type: :if, condition: "active", path: ["active"]},
+               %{type: :endif, condition: nil, path: nil}
              ] = result
     end
 
-    test "detects case-insensitive @IF:variable@ markers" do
+    test "detects case-insensitive {{if variable}} markers" do
       # Arrange
-      text = "@IF:name@ content"
+      text = "{{if name}} content"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :if, condition: "name", path: ["name"], position: 0}] = result
+      assert [%{type: :if, condition: "name", path: ["name"]}] = result
     end
 
-    test "detects case-insensitive @If:Variable@ markers" do
+    test "detects case-insensitive {{if Variable}} markers" do
       # Arrange
-      text = "@If:UserName@ content"
+      text = "{{if UserName}} content"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :if, condition: "UserName", path: ["UserName"], position: 0}] = result
+      assert [%{type: :if, condition: "UserName", path: ["UserName"]}] = result
     end
 
-    test "detects case-insensitive @ENDIF@ markers" do
+    test "detects case-insensitive {{endif}} markers" do
       # Arrange
-      text = "@if:name@ @ENDIF@"
+      text = "{{if name}} {{endif}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
       assert [
-               %{type: :if, condition: "name", path: ["name"], position: 0},
-               %{type: :endif, condition: nil, path: nil, position: 10}
+               %{type: :if, condition: "name", path: ["name"]},
+               %{type: :endif, condition: nil, path: nil}
              ] = result
     end
 
     test "detects nested data paths in conditions" do
       # Arrange
-      text = "@if:customer.active@"
+      text = "{{if customer.active}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
       assert [
-               %{type: :if, condition: "customer.active", path: ["customer", "active"], position: 0}
+               %{type: :if, condition: "customer.active", path: ["customer", "active"]}
              ] = result
     end
 
     test "detects deeply nested data paths" do
       # Arrange
-      text = "@if:user.profile.name@"
+      text = "{{if user.profile.name}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
@@ -107,8 +107,7 @@ defmodule Ootempl.ConditionalTest do
                %{
                  type: :if,
                  condition: "user.profile.name",
-                 path: ["user", "profile", "name"],
-                 position: 0
+                 path: ["user", "profile", "name"]
                }
              ] = result
     end
@@ -137,40 +136,40 @@ defmodule Ootempl.ConditionalTest do
 
     test "detects multiple consecutive conditionals" do
       # Arrange
-      text = "@if:first@@endif@@if:second@@endif@"
+      text = "{{if first}}{{endif}}{{if second}}{{endif}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
       assert [
-               %{type: :if, condition: "first", position: 0},
-               %{type: :endif, position: 10},
-               %{type: :if, condition: "second", position: 17},
-               %{type: :endif, position: 28}
+               %{type: :if, condition: "first"},
+               %{type: :endif},
+               %{type: :if, condition: "second"},
+               %{type: :endif}
              ] = result
     end
 
     test "handles variables starting with underscore" do
       # Arrange
-      text = "@if:_private@"
+      text = "{{if _private}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :if, condition: "_private", path: ["_private"], position: 0}] = result
+      assert [%{type: :if, condition: "_private", path: ["_private"]}] = result
     end
 
     test "handles variables with numbers" do
       # Arrange
-      text = "@if:user123@"
+      text = "{{if user123}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :if, condition: "user123", path: ["user123"], position: 0}] = result
+      assert [%{type: :if, condition: "user123", path: ["user123"]}] = result
     end
 
     test "ignores malformed @if:@ without variable" do
@@ -184,7 +183,7 @@ defmodule Ootempl.ConditionalTest do
       assert [] = result
     end
 
-    test "ignores @if@ without variable starting with number" do
+    test "ignores {{if}} without variable starting with number" do
       # Arrange
       text = "@if:123name@ content"
 
@@ -206,56 +205,56 @@ defmodule Ootempl.ConditionalTest do
       assert [] = result
     end
 
-    test "detects @else@ markers" do
+    test "detects {{else}} markers" do
       # Arrange
-      text = "Hello @else@ world"
+      text = "Hello {{else}} world"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :else, condition: nil, path: nil, position: 6}] = result
+      assert [%{type: :else, condition: nil, path: nil}] = result
     end
 
-    test "detects @if@, @else@, and @endif@ markers in order" do
+    test "detects {{if}}, {{else}}, and {{endif}} markers in order" do
       # Arrange
-      text = "@if:show@yes@else@no@endif@"
+      text = "{{if show}}yes{{else}}no{{endif}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
       assert [
-               %{type: :if, condition: "show", path: ["show"], position: 0},
-               %{type: :else, condition: nil, path: nil, position: 12},
-               %{type: :endif, condition: nil, path: nil, position: 20}
+               %{type: :if, condition: "show", path: ["show"]},
+               %{type: :else, condition: nil, path: nil},
+               %{type: :endif, condition: nil, path: nil}
              ] = result
     end
 
-    test "detects case-insensitive @ELSE@ markers" do
+    test "detects case-insensitive {{else}} markers" do
       # Arrange
-      text = "@if:name@ @ELSE@ @endif@"
+      text = "{{if name}} {{else}} {{endif}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
       assert [
-               %{type: :if, condition: "name", path: ["name"], position: 0},
-               %{type: :else, condition: nil, path: nil, position: 10},
-               %{type: :endif, condition: nil, path: nil, position: 17}
+               %{type: :if, condition: "name", path: ["name"]},
+               %{type: :else, condition: nil, path: nil},
+               %{type: :endif, condition: nil, path: nil}
              ] = result
     end
 
-    test "detects @Else@ with mixed case" do
+    test "detects {{else}} with mixed case" do
       # Arrange
-      text = "@Else@"
+      text = "{{else}}"
 
       # Act
       result = Conditional.detect_conditionals(text)
 
       # Assert
-      assert [%{type: :else, condition: nil, path: nil, position: 0}] = result
+      assert [%{type: :else, condition: nil, path: nil}] = result
     end
   end
 
@@ -278,9 +277,9 @@ defmodule Ootempl.ConditionalTest do
       # Arrange
       conditionals = [
         %{type: :if, condition: "first", path: ["first"], position: 0},
-        %{type: :endif, condition: nil, path: nil, position: 12},
+        %{type: :endif, condition: nil, path: nil, position: 15},
         %{type: :if, condition: "second", path: ["second"], position: 20},
-        %{type: :endif, condition: nil, path: nil, position: 33}
+        %{type: :endif, condition: nil, path: nil, position: 35}
       ]
 
       # Act
@@ -301,7 +300,7 @@ defmodule Ootempl.ConditionalTest do
       assert :ok = result
     end
 
-    test "returns error for unmatched @if@" do
+    test "returns error for unmatched {{if}}" do
       # Arrange
       conditionals = [
         %{type: :if, condition: "name", path: ["name"], position: 5}
@@ -311,10 +310,10 @@ defmodule Ootempl.ConditionalTest do
       result = Conditional.validate_pairs(conditionals)
 
       # Assert
-      assert {:error, "Unmatched @if:name@ at position 5"} = result
+      assert {:error, "Unmatched {{if name}} at position 5"} = result
     end
 
-    test "returns error for orphan @endif@" do
+    test "returns error for orphan {{endif}}" do
       # Arrange
       conditionals = [
         %{type: :endif, condition: nil, path: nil, position: 10}
@@ -324,10 +323,10 @@ defmodule Ootempl.ConditionalTest do
       result = Conditional.validate_pairs(conditionals)
 
       # Assert
-      assert {:error, "Orphan @endif@ at position 10 (no matching @if@)"} = result
+      assert {:error, "Orphan {{endif}} at position 10 (no matching {{if}})"} = result
     end
 
-    test "returns error for @endif@ before @if@" do
+    test "returns error for {{endif}} before {{if}}" do
       # Arrange
       conditionals = [
         %{type: :endif, condition: nil, path: nil, position: 0},
@@ -338,29 +337,29 @@ defmodule Ootempl.ConditionalTest do
       result = Conditional.validate_pairs(conditionals)
 
       # Assert
-      assert {:error, "Orphan @endif@ at position 0 (no matching @if@)"} = result
+      assert {:error, "Orphan {{endif}} at position 0 (no matching {{if}})"} = result
     end
 
-    test "returns error for multiple unmatched @if@ markers" do
+    test "returns error for multiple unmatched {{if}} markers" do
       # Arrange
       conditionals = [
         %{type: :if, condition: "first", path: ["first"], position: 0},
-        %{type: :if, condition: "second", path: ["second"], position: 12},
-        %{type: :endif, condition: nil, path: nil, position: 25}
+        %{type: :if, condition: "second", path: ["second"], position: 15},
+        %{type: :endif, condition: nil, path: nil, position: 30}
       ]
 
       # Act
       result = Conditional.validate_pairs(conditionals)
 
       # Assert
-      assert {:error, "Unmatched @if:first@ at position 0"} = result
+      assert {:error, "Unmatched {{if first}} at position 0"} = result
     end
 
-    test "detects first orphan @endif@ in sequence" do
+    test "detects first orphan {{endif}} in sequence" do
       # Arrange
       conditionals = [
         %{type: :if, condition: "name", path: ["name"], position: 0},
-        %{type: :endif, condition: nil, path: nil, position: 10},
+        %{type: :endif, condition: nil, path: nil, position: 13},
         %{type: :endif, condition: nil, path: nil, position: 18}
       ]
 
@@ -368,15 +367,15 @@ defmodule Ootempl.ConditionalTest do
       result = Conditional.validate_pairs(conditionals)
 
       # Assert
-      assert {:error, "Orphan @endif@ at position 18 (no matching @if@)"} = result
+      assert {:error, "Orphan {{endif}} at position 18 (no matching {{if}})"} = result
     end
 
     test "validates properly matched if/else/endif triplet" do
       # Arrange
       conditionals = [
         %{type: :if, condition: "show", path: ["show"], position: 0},
-        %{type: :else, condition: nil, path: nil, position: 13},
-        %{type: :endif, condition: nil, path: nil, position: 22}
+        %{type: :else, condition: nil, path: nil, position: 12},
+        %{type: :endif, condition: nil, path: nil, position: 21}
       ]
 
       # Act
@@ -386,7 +385,7 @@ defmodule Ootempl.ConditionalTest do
       assert :ok = result
     end
 
-    test "returns error for orphan @else@ without @if@" do
+    test "returns error for orphan {{else}} without {{if}}" do
       # Arrange
       conditionals = [
         %{type: :else, condition: nil, path: nil, position: 5}
@@ -396,34 +395,34 @@ defmodule Ootempl.ConditionalTest do
       result = Conditional.validate_pairs(conditionals)
 
       # Assert
-      assert {:error, "Orphan @else@ at position 5 (no matching @if@)"} = result
+      assert {:error, "Orphan {{else}} at position 5 (no matching {{if}})"} = result
     end
 
-    test "returns error for multiple @else@ in same block" do
+    test "returns error for multiple {{else}} in same block" do
       # Arrange
       conditionals = [
         %{type: :if, condition: "x", path: ["x"], position: 0},
-        %{type: :else, condition: nil, path: nil, position: 10},
-        %{type: :else, condition: nil, path: nil, position: 20},
-        %{type: :endif, condition: nil, path: nil, position: 30}
+        %{type: :else, condition: nil, path: nil, position: 5},
+        %{type: :else, condition: nil, path: nil, position: 14},
+        %{type: :endif, condition: nil, path: nil, position: 23}
       ]
 
       # Act
       result = Conditional.validate_pairs(conditionals)
 
       # Assert
-      assert {:error, "Multiple @else@ markers in conditional block starting at position 0"} = result
+      assert {:error, "Multiple {{else}} markers in conditional block starting at position 0"} = result
     end
 
     test "validates multiple if/else/endif blocks" do
       # Arrange
       conditionals = [
         %{type: :if, condition: "first", path: ["first"], position: 0},
-        %{type: :else, condition: nil, path: nil, position: 12},
-        %{type: :endif, condition: nil, path: nil, position: 20},
-        %{type: :if, condition: "second", path: ["second"], position: 30},
-        %{type: :else, condition: nil, path: nil, position: 45},
-        %{type: :endif, condition: nil, path: nil, position: 53}
+        %{type: :else, condition: nil, path: nil, position: 13},
+        %{type: :endif, condition: nil, path: nil, position: 22},
+        %{type: :if, condition: "second", path: ["second"], position: 32},
+        %{type: :else, condition: nil, path: nil, position: 46},
+        %{type: :endif, condition: nil, path: nil, position: 55}
       ]
 
       # Act
@@ -437,7 +436,7 @@ defmodule Ootempl.ConditionalTest do
       # Arrange
       conditionals = [
         %{type: :if, condition: "show", path: ["show"], position: 0},
-        %{type: :endif, condition: nil, path: nil, position: 13}
+        %{type: :endif, condition: nil, path: nil, position: 12}
       ]
 
       # Act
@@ -452,11 +451,11 @@ defmodule Ootempl.ConditionalTest do
     test "handles complex template with multiple sections" do
       # Arrange
       text = """
-      Dear @if:customer.premium@Premium@endif@ Customer,
+      Dear {{if customer.premium}}Premium{{endif}} Customer,
 
-      @if:show_discount@
+      {{if show_discount}}
       Your discount code is: SAVE20
-      @endif@
+      {{endif}}
 
       Thank you!
       """
@@ -473,11 +472,11 @@ defmodule Ootempl.ConditionalTest do
     test "detects validation error in complex template" do
       # Arrange
       text = """
-      @if:section1@
+      {{if section1}}
       Content 1
-      @endif@
+      {{endif}}
 
-      @if:section2@
+      {{if section2}}
       Content 2
       """
 
@@ -487,7 +486,7 @@ defmodule Ootempl.ConditionalTest do
 
       # Assert
       assert {:error, message} = validation
-      assert message =~ "Unmatched @if:section2@"
+      assert message =~ "Unmatched {{if section2}}"
     end
 
     test "handles template with no conditionals" do
@@ -694,7 +693,7 @@ defmodule Ootempl.ConditionalTest do
       xml_string = """
       <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:body>
-          <w:p><w:r><w:t>@if:active@Content@endif@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>{{if active}}Content{{endif}}</w:t></w:r></w:p>
         </w:body>
       </w:document>
       """
@@ -702,7 +701,7 @@ defmodule Ootempl.ConditionalTest do
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
 
       # Act
-      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      result = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Assert
       assert {:ok, {start_para, end_para}} = result
@@ -714,10 +713,10 @@ defmodule Ootempl.ConditionalTest do
       xml_string = """
       <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:body>
-          <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>{{if active}}</w:t></w:r></w:p>
           <w:p><w:r><w:t>Content line 1</w:t></w:r></w:p>
           <w:p><w:r><w:t>Content line 2</w:t></w:r></w:p>
-          <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
         </w:body>
       </w:document>
       """
@@ -725,7 +724,7 @@ defmodule Ootempl.ConditionalTest do
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
 
       # Act
-      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      result = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Assert
       assert {:ok, {start_para, end_para}} = result
@@ -738,7 +737,7 @@ defmodule Ootempl.ConditionalTest do
       <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:body>
           <w:p><w:r><w:t>Content</w:t></w:r></w:p>
-          <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
         </w:body>
       </w:document>
       """
@@ -746,7 +745,7 @@ defmodule Ootempl.ConditionalTest do
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
 
       # Act
-      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      result = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Assert
       assert {:error, :if_marker_not_found} = result
@@ -757,7 +756,7 @@ defmodule Ootempl.ConditionalTest do
       xml_string = """
       <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:body>
-          <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>{{if active}}</w:t></w:r></w:p>
           <w:p><w:r><w:t>Content</w:t></w:r></w:p>
         </w:body>
       </w:document>
@@ -766,7 +765,7 @@ defmodule Ootempl.ConditionalTest do
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
 
       # Act
-      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      result = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Assert
       assert {:error, :endif_marker_not_found} = result
@@ -777,13 +776,13 @@ defmodule Ootempl.ConditionalTest do
       xml_string = """
       <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:body>
-          <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>{{if active}}</w:t></w:r></w:p>
           <w:tbl>
             <w:tr>
               <w:tc><w:p><w:r><w:t>Table cell</w:t></w:r></w:p></w:tc>
             </w:tr>
           </w:tbl>
-          <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+          <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
         </w:body>
       </w:document>
       """
@@ -791,7 +790,7 @@ defmodule Ootempl.ConditionalTest do
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
 
       # Act
-      result = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      result = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Assert
       assert {:ok, {_start_para, _end_para}} = result
@@ -805,12 +804,12 @@ defmodule Ootempl.ConditionalTest do
       # Arrange
       xml_string = """
       <w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-        <w:p><w:r><w:t>@if:active@Content@endif@</w:t></w:r></w:p>
+        <w:p><w:r><w:t>{{if active}}Content{{endif}}</w:t></w:r></w:p>
       </w:body>
       """
 
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
-      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Act
       result = Conditional.collect_section_nodes(doc, start_para, end_para)
@@ -825,16 +824,16 @@ defmodule Ootempl.ConditionalTest do
       xml_string = """
       <w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:p><w:r><w:t>Before</w:t></w:r></w:p>
-        <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+        <w:p><w:r><w:t>{{if active}}</w:t></w:r></w:p>
         <w:p><w:r><w:t>Content 1</w:t></w:r></w:p>
         <w:p><w:r><w:t>Content 2</w:t></w:r></w:p>
-        <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+        <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
         <w:p><w:r><w:t>After</w:t></w:r></w:p>
       </w:body>
       """
 
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
-      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Act
       result = Conditional.collect_section_nodes(doc, start_para, end_para)
@@ -855,16 +854,16 @@ defmodule Ootempl.ConditionalTest do
       # Arrange
       xml_string = """
       <w:body xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-        <w:p><w:r><w:t>@if:active@</w:t></w:r></w:p>
+        <w:p><w:r><w:t>{{if active}}</w:t></w:r></w:p>
         <w:tbl>
           <w:tr><w:tc><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc></w:tr>
         </w:tbl>
-        <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+        <w:p><w:r><w:t>{{endif}}</w:t></w:r></w:p>
       </w:body>
       """
 
       {:ok, doc} = Ootempl.Xml.parse(xml_string)
-      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "@if:active@", "@endif@")
+      {:ok, {start_para, end_para}} = Conditional.find_section_boundaries(doc, "{{if active}}", "{{endif}}")
 
       # Act
       result = Conditional.collect_section_nodes(doc, start_para, end_para)

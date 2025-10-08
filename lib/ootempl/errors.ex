@@ -229,7 +229,7 @@ defmodule Ootempl.ImageError do
       # Missing image path in data
       iex> Ootempl.render("template.docx", %{}, "out.docx")
       {:error, %Ootempl.ImageError{
-        message: "Image placeholder '@image:logo@' has no corresponding data key 'logo'",
+        message: "Image placeholder '{{image:logo}}' has no corresponding data key 'logo'",
         placeholder_name: "logo",
         image_path: nil,
         reason: :image_not_found_in_data
@@ -279,7 +279,7 @@ defmodule Ootempl.ImageError do
   end
 
   defp build_message(placeholder_name, nil, :image_not_found_in_data) do
-    "Image placeholder '@image:#{placeholder_name}@' has no corresponding data key '#{placeholder_name}'"
+    "Image placeholder '{{image:#{placeholder_name}}}' has no corresponding data key '#{placeholder_name}'"
   end
 
   defp build_message(placeholder_name, image_path, :file_not_found) do

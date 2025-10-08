@@ -19,12 +19,12 @@ defmodule Ootempl.Image do
   defrecord :xmlAttribute, extract(:xmlAttribute, from_lib: "xmerl/include/xmerl.hrl")
   defrecord :xmlText, extract(:xmlText, from_lib: "xmerl/include/xmerl.hrl")
 
-  @image_marker_regex ~r/^@image:([a-zA-Z0-9_-]+)@$/
+  @image_marker_regex ~r/^(?<!\\)\{\{image:([a-zA-Z0-9_-]+)\}\}$/
 
   @doc """
   Finds all placeholder images in the given XML element.
 
-  Searches for `w:drawing` elements that contain alt text matching the pattern `@image:name@`.
+  Searches for `w:drawing` elements that contain alt text matching the pattern `{{image:name}}`.
 
   ## Parameters
 
@@ -36,7 +36,7 @@ defmodule Ootempl.Image do
 
       %{
         placeholder_name: "logo",
-        alt_text: "@image:logo@",
+        alt_text: "{{image:logo}}",
         xml_element: xml_drawing,
         relationship_id: "rId5",
         template_dimensions: {width, height}
@@ -48,7 +48,7 @@ defmodule Ootempl.Image do
       [
         %{
           placeholder_name: "logo",
-          alt_text: "@image:logo@",
+          alt_text: "{{image:logo}}",
           xml_element: {...},
           relationship_id: "rId5",
           template_dimensions: {100, 100}
@@ -200,7 +200,12 @@ defmodule Ootempl.Image do
       iex> Ootempl.Image.calculate_scaled_dimensions({100, 100}, {200, 100})
       {100.0, 100.0}
   """
-  @spec calculate_scaled_dimensions({number(), number()}, {number(), number()}) :: {float(), float()}
+  @spec calculate_scaled_dimensions({number(), number()}, {number(), number()} | nil) :: {float(), float()}
+  def calculate_scaled_dimensions({src_width, src_height}, nil) do
+    # No template dimensions - use original image dimensions
+    {src_width * 1.0, src_height * 1.0}
+  end
+
   def calculate_scaled_dimensions({src_width, src_height}, {template_width, template_height}) do
     width_scale = template_width / src_width
     height_scale = template_height / src_height

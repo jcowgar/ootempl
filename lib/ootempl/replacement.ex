@@ -2,12 +2,13 @@ defmodule Ootempl.Replacement do
   @moduledoc """
   Replaces placeholders in Word XML text nodes while preserving formatting.
 
-  This module handles the core XML manipulation logic for replacing `@variable@`
+  This module handles the core XML manipulation logic for replacing `{{variable}}`
   placeholders with values from data maps. It handles the complexities of Word's
   XML structure, including:
 
   - Preserving Word formatting (bold, italic, font, size, color)
   - XML-escaping replacement values to prevent corruption
+  - Unescaping literal `\{{` and `\}}` sequences to `{{` and `}}`
   - Collecting all errors for batch reporting
 
   ## Word XML Structure
@@ -18,7 +19,7 @@ defmodule Ootempl.Replacement do
       <w:p>  <!-- paragraph -->
         <w:r>  <!-- run with formatting -->
           <w:rPr>...</w:rPr>  <!-- run properties (formatting) -->
-          <w:t>Hello @name@</w:t>  <!-- text -->
+          <w:t>Hello {{name}}</w:t>  <!-- text -->
         </w:r>
       </w:p>
 
@@ -34,7 +35,7 @@ defmodule Ootempl.Replacement do
       Replacing placeholders in a Word document:
 
           data = %{"name" => "World"}
-          {:ok, doc} = Ootempl.Xml.parse("<w:p><w:r><w:t>Hello @name@</w:t></w:r></w:p>")
+          {:ok, doc} = Ootempl.Xml.parse("<w:p><w:r><w:t>Hello {{name}}</w:t></w:r></w:p>")
           {:ok, result} = Ootempl.Replacement.replace_in_document(doc, data)
           # result now contains "Hello World"
   """
@@ -81,17 +82,17 @@ defmodule Ootempl.Replacement do
       Successful replacement:
 
           import Ootempl.Xml
-          {:ok, doc} = Ootempl.Xml.parse("<w:p><w:r><w:t>@name@</w:t></w:r></w:p>")
+          {:ok, doc} = Ootempl.Xml.parse("<w:p><w:r><w:t>{{name}}</w:t></w:r></w:p>")
           Ootempl.Replacement.replace_in_document(doc, %{"name" => "John"})
           # => {:ok, modified_xml}
 
       Missing placeholder:
 
-          {:ok, doc} = Ootempl.Xml.parse("<w:p><w:r><w:t>@missing@</w:t></w:r></w:p>")
+          {:ok, doc} = Ootempl.Xml.parse("<w:p><w:r><w:t>{{missing}}</w:t></w:r></w:p>")
           Ootempl.Replacement.replace_in_document(doc, %{})
           # => {:error, %Ootempl.PlaceholderError{
-          #      message: "Placeholder @missing@ could not be resolved",
-          #      placeholders: [%{placeholder: "@missing@", reason: {:path_not_found, ["missing"]}}]
+          #      message: "Placeholder {{missing}} could not be resolved",
+          #      placeholders: [%{placeholder: "{{missing}}", reason: {:path_not_found, ["missing"]}}]
           #    }}
   """
   @spec replace_in_document(xml_element(), map()) ::
@@ -140,11 +141,20 @@ defmodule Ootempl.Replacement do
 
     # Only modify the text node if there were no errors
     if errors == [] do
-      modified_node = xmlText(text_node, value: String.to_charlist(modified_text))
+      # Unescape any literal {{ or }} sequences
+      unescaped_text = unescape_braces(modified_text)
+      modified_node = xmlText(text_node, value: String.to_charlist(unescaped_text))
       {:ok, modified_node, []}
     else
       {:ok, text_node, errors}
     end
+  end
+
+  @spec unescape_braces(String.t()) :: String.t()
+  defp unescape_braces(text) when is_binary(text) do
+    text
+    |> String.replace("\\{{", "{{")
+    |> String.replace("\\}}", "}}")
   end
 
   @spec xml_escape(String.t()) :: String.t()

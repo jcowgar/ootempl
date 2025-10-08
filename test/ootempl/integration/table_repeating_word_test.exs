@@ -3,10 +3,10 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
   Integration tests for the "Table Repeating Rows from Word.docx" template.
 
   This template was created directly in Microsoft Word and contains:
-  - Simple variable replacement (@person.first_name@)
-  - Table with repeating rows (@people.first_name@, @people.last_name@, @people.age@)
-  - Static column (@client@)
-  - Summary row with calculated field (@average_age@)
+  - Simple variable replacement ({{person.first_name}})
+  - Table with repeating rows ({{people.first_name}}, {{people.last_name}}, {{people.age}})
+  - Static column ({{client}})
+  - Summary row with calculated field ({{average_age}})
   """
 
   use ExUnit.Case
@@ -71,12 +71,12 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       assert output_xml =~ "35"
 
       # Verify placeholders were replaced
-      refute output_xml =~ "@person.first_name@"
-      refute output_xml =~ "@client@"
-      refute output_xml =~ "@people.first_name@"
-      refute output_xml =~ "@people.last_name@"
-      refute output_xml =~ "@people.age@"
-      refute output_xml =~ "@average_age@"
+      refute output_xml =~ "{{person.first_name}}"
+      refute output_xml =~ "{{client}}"
+      refute output_xml =~ "{{people.first_name}}"
+      refute output_xml =~ "{{people.last_name}}"
+      refute output_xml =~ "{{people.age}}"
+      refute output_xml =~ "{{average_age}}"
     end
 
     test "handles single person in table" do
@@ -127,7 +127,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       assert output_xml =~ "0"
 
       # Template placeholders should not appear
-      refute output_xml =~ "@people.first_name@"
+      refute output_xml =~ "{{people.first_name}}"
     end
 
     test "handles numeric ages correctly" do

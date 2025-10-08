@@ -28,7 +28,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       template_path = Path.join(@temp_error_dir, "single_missing.docx")
       output_path = Path.join(@temp_error_dir, "single_missing_output.docx")
 
-      create_placeholder_docx(template_path, "@name@")
+      create_placeholder_docx(template_path, "{{name}}")
 
       # Act - render without providing data
       result = Ootempl.render(template_path, %{}, output_path)
@@ -36,11 +36,11 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       # Assert
       assert {:error,
               %Ootempl.PlaceholderError{
-                placeholders: [%{placeholder: "@name@"}]
+                placeholders: [%{placeholder: "{{name}}"}]
               } = placeholder_error} = result
 
       # Should use singular message for single placeholder
-      assert placeholder_error.message =~ "Placeholder @name@ could not be resolved"
+      assert placeholder_error.message =~ "Placeholder {{name}} could not be resolved"
       refute placeholder_error.message =~ "placeholders"
     end
 
@@ -49,7 +49,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       template_path = Path.join(@temp_error_dir, "multiple_missing.docx")
       output_path = Path.join(@temp_error_dir, "multiple_missing_output.docx")
 
-      create_placeholder_docx(template_path, "@first_name@ @last_name@ @email@")
+      create_placeholder_docx(template_path, "{{first_name}} {{last_name}} {{email}}")
 
       # Act - render without providing data
       result = Ootempl.render(template_path, %{}, output_path)
@@ -59,7 +59,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
 
       # Should use plural message for multiple placeholders
       assert placeholder_error.message =~ "3 placeholders could not be resolved"
-      assert placeholder_error.message =~ "first: @first_name@"
+      assert placeholder_error.message =~ "first: {{first_name}}"
       assert length(placeholder_error.placeholders) == 3
     end
 
@@ -68,7 +68,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       template_path = Path.join(@temp_error_dir, "path_not_found.docx")
       output_path = Path.join(@temp_error_dir, "path_not_found_output.docx")
 
-      create_placeholder_docx(template_path, "@person.name@")
+      create_placeholder_docx(template_path, "{{person.name}}")
 
       # Act - provide data but not the nested path
       result = Ootempl.render(template_path, %{"other" => "data"}, output_path)
@@ -76,7 +76,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       # Assert
       assert {:error,
               %Ootempl.PlaceholderError{
-                placeholders: [%{placeholder: "@person.name@", reason: {:path_not_found, ["person", "name"]}}]
+                placeholders: [%{placeholder: "{{person.name}}", reason: {:path_not_found, ["person", "name"]}}]
               }} = result
     end
 
@@ -85,7 +85,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       template_path = Path.join(@temp_error_dir, "not_a_list.docx")
       output_path = Path.join(@temp_error_dir, "not_a_list_output.docx")
 
-      create_placeholder_docx(template_path, "@items.0@")
+      create_placeholder_docx(template_path, "{{items.0}}")
 
       # Act - provide string instead of list
       result = Ootempl.render(template_path, %{"items" => "not a list"}, output_path)
@@ -93,7 +93,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       # Assert
       assert {:error,
               %Ootempl.PlaceholderError{
-                placeholders: [%{placeholder: "@items.0@"}]
+                placeholders: [%{placeholder: "{{items.0}}"}]
               }} = result
     end
 
@@ -102,7 +102,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       template_path = Path.join(@temp_error_dir, "index_out_of_bounds.docx")
       output_path = Path.join(@temp_error_dir, "index_out_of_bounds_output.docx")
 
-      create_placeholder_docx(template_path, "@items.5@")
+      create_placeholder_docx(template_path, "{{items.5}}")
 
       # Act - provide list with only 2 items
       result = Ootempl.render(template_path, %{"items" => ["a", "b"]}, output_path)
@@ -110,7 +110,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       # Assert
       assert {:error,
               %Ootempl.PlaceholderError{
-                placeholders: [%{placeholder: "@items.5@"}]
+                placeholders: [%{placeholder: "{{items.5}}"}]
               }} = result
     end
 
@@ -119,7 +119,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       template_path = Path.join(@temp_error_dir, "nil_value.docx")
       output_path = Path.join(@temp_error_dir, "nil_value_output.docx")
 
-      create_placeholder_docx(template_path, "@name@")
+      create_placeholder_docx(template_path, "{{name}}")
 
       # Act - provide nil value
       result = Ootempl.render(template_path, %{"name" => nil}, output_path)
@@ -127,7 +127,7 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       # Assert
       assert {:error,
               %Ootempl.PlaceholderError{
-                placeholders: [%{placeholder: "@name@", reason: :nil_value}]
+                placeholders: [%{placeholder: "{{name}}", reason: :nil_value}]
               }} = result
     end
   end

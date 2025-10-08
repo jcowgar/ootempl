@@ -49,8 +49,8 @@ defmodule Ootempl.Integration.RenderTest do
       {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
       assert output_xml =~ "Marty McFly"
       assert output_xml =~ "October 26, 1985"
-      refute output_xml =~ "@person.first_name@"
-      refute output_xml =~ "@date@"
+      refute output_xml =~ "{{person.first_name}}"
+      refute output_xml =~ "{{date}}"
     end
 
     test "replaces nested data placeholders" do
@@ -133,8 +133,8 @@ defmodule Ootempl.Integration.RenderTest do
       # Check error structure
       [%{placeholder: placeholder, reason: reason} | _] = error.placeholders
       assert is_binary(placeholder)
-      assert String.starts_with?(placeholder, "@")
-      assert String.ends_with?(placeholder, "@")
+      assert String.starts_with?(placeholder, "{{")
+      assert String.ends_with?(placeholder, "}}")
       assert {:path_not_found, _path} = reason
     end
 
@@ -285,7 +285,14 @@ defmodule Ootempl.Integration.RenderTest do
       template_file_count =
         try do
           {:ok, file_list} = :zip.zip_list_dir(zip_handle)
-          length(file_list)
+
+          file_list
+          |> Enum.map(fn
+            {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
+            _ -> ""
+          end)
+          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
+          |> length()
         after
           :zip.zip_close(zip_handle)
         end
@@ -299,7 +306,14 @@ defmodule Ootempl.Integration.RenderTest do
       output_file_count =
         try do
           {:ok, file_list} = :zip.zip_list_dir(zip_handle)
-          length(file_list)
+
+          file_list
+          |> Enum.map(fn
+            {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
+            _ -> ""
+          end)
+          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
+          |> length()
         after
           :zip.zip_close(zip_handle)
         end
@@ -434,8 +448,8 @@ defmodule Ootempl.Integration.RenderTest do
       assert output_xml =~ "350.50"
 
       # Template placeholders should be replaced
-      refute output_xml =~ "@claims.id@"
-      refute output_xml =~ "@claims.amount@"
+      refute output_xml =~ "{{claims.id}}"
+      refute output_xml =~ "{{claims.amount}}"
     end
 
     test "handles empty list by removing template row" do
@@ -463,7 +477,7 @@ defmodule Ootempl.Integration.RenderTest do
 
       # Should have total but no claim rows
       assert output_xml =~ "0.00"
-      refute output_xml =~ "@claims.id@"
+      refute output_xml =~ "{{claims.id}}"
     end
 
     test "processes mixed table with header, template, and footer rows" do
@@ -676,7 +690,7 @@ defmodule Ootempl.Integration.RenderTest do
       # Verify header was processed
       {:ok, header_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/header1.xml")
       assert header_xml =~ "Acme Corp"
-      refute header_xml =~ "@company_name@"
+      refute header_xml =~ "{{company_name}}"
     end
 
     test "replaces placeholders in document footers" do
@@ -703,7 +717,7 @@ defmodule Ootempl.Integration.RenderTest do
       # Verify footer was processed
       {:ok, footer_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/footer1.xml")
       assert footer_xml =~ "Confidential"
-      refute footer_xml =~ "@footer_text@"
+      refute footer_xml =~ "{{footer_text}}"
     end
 
     test "processes multiple header files (first page, odd/even)" do
@@ -754,7 +768,7 @@ defmodule Ootempl.Integration.RenderTest do
       assert {:error, %Ootempl.PlaceholderError{} = error} = result
       assert length(error.placeholders) > 0
       placeholders = Enum.map(error.placeholders, & &1.placeholder)
-      assert "@company_name@" in placeholders
+      assert "{{company_name}}" in placeholders
     end
   end
 

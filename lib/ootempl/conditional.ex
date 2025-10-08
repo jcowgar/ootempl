@@ -4,31 +4,31 @@ defmodule Ootempl.Conditional do
 
   Conditional markers allow showing or hiding document sections based on data conditions.
   Markers follow the syntax:
-  - `@if:variable@` - Start of conditional section
-  - `@else@` - Alternative content when condition is false (optional)
-  - `@endif@` - End of conditional section
+  - `{{if variable}}` - Start of conditional section
+  - `{{else}}` - Alternative content when condition is false (optional)
+  - `{{endif}}` - End of conditional section
 
   Markers are case-insensitive and support nested data paths using dot notation.
 
   ## Examples
 
-      iex> Ootempl.Conditional.detect_conditionals("Hello @if:name@ world @endif@")
+      iex> Ootempl.Conditional.detect_conditionals("Hello {{if name}} world {{endif}}")
       [
         %{type: :if, condition: "name", path: ["name"], position: 6},
-        %{type: :endif, condition: nil, path: nil, position: 22}
+        %{type: :endif, condition: nil, path: nil, position: 24}
       ]
 
-      iex> Ootempl.Conditional.detect_conditionals("@if:customer.active@ content @endif@")
+      iex> Ootempl.Conditional.detect_conditionals("{{if customer.active}} content {{endif}}")
       [
         %{type: :if, condition: "customer.active", path: ["customer", "active"], position: 0},
-        %{type: :endif, condition: nil, path: nil, position: 29}
+        %{type: :endif, condition: nil, path: nil, position: 31}
       ]
 
-      iex> Ootempl.Conditional.detect_conditionals("@if:premium@ VIP @else@ Standard @endif@")
+      iex> Ootempl.Conditional.detect_conditionals("{{if premium}} VIP {{else}} Standard {{endif}}")
       [
         %{type: :if, condition: "premium", path: ["premium"], position: 0},
-        %{type: :else, condition: nil, path: nil, position: 17},
-        %{type: :endif, condition: nil, path: nil, position: 33}
+        %{type: :else, condition: nil, path: nil, position: 19},
+        %{type: :endif, condition: nil, path: nil, position: 37}
       ]
   """
 
@@ -41,9 +41,9 @@ defmodule Ootempl.Conditional do
           position: integer()
         }
 
-  @if_pattern ~r/@if:([a-zA-Z_][a-zA-Z0-9_.]*)@/i
-  @else_pattern ~r/@else@/i
-  @endif_pattern ~r/@endif@/i
+  @if_pattern ~r/(?<!\\)\{\{if\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/i
+  @else_pattern ~r/(?<!\\)\{\{else\}\}/i
+  @endif_pattern ~r/(?<!\\)\{\{endif\}\}/i
 
   @doc """
   Detects all conditional markers in the given text.
@@ -64,20 +64,20 @@ defmodule Ootempl.Conditional do
 
   ## Examples
 
-      iex> Ootempl.Conditional.detect_conditionals("@if:active@content@endif@")
+      iex> Ootempl.Conditional.detect_conditionals("{{if active}}content{{endif}}")
       [
         %{type: :if, condition: "active", path: ["active"], position: 0},
-        %{type: :endif, condition: nil, path: nil, position: 18}
+        %{type: :endif, condition: nil, path: nil, position: 20}
       ]
 
       iex> Ootempl.Conditional.detect_conditionals("no markers here")
       []
 
-      iex> Ootempl.Conditional.detect_conditionals("@if:show@yes@else@no@endif@")
+      iex> Ootempl.Conditional.detect_conditionals("{{if show}}yes{{else}}no{{endif}}")
       [
         %{type: :if, condition: "show", path: ["show"], position: 0},
-        %{type: :else, condition: nil, path: nil, position: 12},
-        %{type: :endif, condition: nil, path: nil, position: 20}
+        %{type: :else, condition: nil, path: nil, position: 14},
+        %{type: :endif, condition: nil, path: nil, position: 24}
       ]
   """
   @spec detect_conditionals(String.t()) :: [conditional()]
@@ -97,9 +97,9 @@ defmodule Ootempl.Conditional do
   @doc """
   Validates that all conditional markers are properly paired.
 
-  Ensures each `@if@` has a corresponding `@endif@` and detects orphaned markers.
-  Also validates that `@else@` markers are properly placed within if/endif blocks
-  and that there is at most one `@else@` per block.
+  Ensures each `{{if}}` has a corresponding `{{endif}}` and detects orphaned markers.
+  Also validates that `{{else}}` markers are properly placed within if/endif blocks
+  and that there is at most one `{{else}}` per block.
 
   ## Parameters
 
@@ -121,17 +121,17 @@ defmodule Ootempl.Conditional do
       iex> Ootempl.Conditional.validate_pairs([
       ...>   %{type: :if, condition: "name", path: ["name"], position: 0}
       ...> ])
-      {:error, "Unmatched @if:name@ at position 0"}
+      {:error, "Unmatched {{if name}} at position 0"}
 
       iex> Ootempl.Conditional.validate_pairs([
       ...>   %{type: :endif, condition: nil, path: nil, position: 0}
       ...> ])
-      {:error, "Orphan @endif@ at position 0 (no matching @if@)"}
+      {:error, "Orphan {{endif}} at position 0 (no matching {{if}})"}
 
       iex> Ootempl.Conditional.validate_pairs([
       ...>   %{type: :else, condition: nil, path: nil, position: 0}
       ...> ])
-      {:error, "Orphan @else@ at position 0 (no matching @if@)"}
+      {:error, "Orphan {{else}} at position 0 (no matching {{if}})"}
 
       iex> Ootempl.Conditional.validate_pairs([
       ...>   %{type: :if, condition: "x", path: ["x"], position: 0},
@@ -139,7 +139,7 @@ defmodule Ootempl.Conditional do
       ...>   %{type: :else, condition: nil, path: nil, position: 20},
       ...>   %{type: :endif, condition: nil, path: nil, position: 30}
       ...> ])
-      {:error, "Multiple @else@ markers in conditional block starting at position 0"}
+      {:error, "Multiple {{else}} markers in conditional block starting at position 0"}
   """
   @spec validate_pairs([conditional()]) :: :ok | {:error, String.t()}
   def validate_pairs(conditionals) when is_list(conditionals) do
@@ -208,14 +208,14 @@ defmodule Ootempl.Conditional do
   @doc """
   Finds section boundaries in an XML document for a conditional section.
 
-  Locates the paragraph containing the `@if@` marker (start boundary) and the
-  paragraph containing the `@endif@` marker (end boundary).
+  Locates the paragraph containing the `{{if}}` marker (start boundary) and the
+  paragraph containing the `{{endif}}` marker (end boundary).
 
   ## Parameters
 
   - `xml_element` - The XML element to search within
-  - `if_marker` - The full if marker text to find (e.g., "@if:active@")
-  - `endif_marker` - The endif marker text to find (e.g., "@endif@")
+  - `if_marker` - The full if marker text to find (e.g., "{{if active}}")
+  - `endif_marker` - The endif marker text to find (e.g., "{{endif}}")
 
   ## Returns
 
@@ -333,7 +333,7 @@ defmodule Ootempl.Conditional do
   defp validate_pairs_recursive([], []), do: :ok
 
   defp validate_pairs_recursive([], [{marker, _else_seen} | _]) do
-    {:error, "Unmatched @if:#{marker.condition}@ at position #{marker.position}"}
+    {:error, "Unmatched {{if #{marker.condition}}} at position #{marker.position}"}
   end
 
   defp validate_pairs_recursive([%{type: :if} = marker | rest], stack) do
@@ -342,12 +342,12 @@ defmodule Ootempl.Conditional do
   end
 
   defp validate_pairs_recursive([%{type: :else} = marker | _rest], []) do
-    {:error, "Orphan @else@ at position #{marker.position} (no matching @if@)"}
+    {:error, "Orphan {{else}} at position #{marker.position} (no matching {{if}})"}
   end
 
   defp validate_pairs_recursive([%{type: :else} = _marker | rest], [{if_marker, else_seen} | stack_rest]) do
     if else_seen do
-      {:error, "Multiple @else@ markers in conditional block starting at position #{if_marker.position}"}
+      {:error, "Multiple {{else}} markers in conditional block starting at position #{if_marker.position}"}
     else
       # Mark that we've seen an else for this if block
       validate_pairs_recursive(rest, [{if_marker, true} | stack_rest])
@@ -355,7 +355,7 @@ defmodule Ootempl.Conditional do
   end
 
   defp validate_pairs_recursive([%{type: :endif} = marker | _rest], []) do
-    {:error, "Orphan @endif@ at position #{marker.position} (no matching @if@)"}
+    {:error, "Orphan {{endif}} at position #{marker.position} (no matching {{if}})"}
   end
 
   defp validate_pairs_recursive([%{type: :endif} | rest], [{_if_marker, _else_seen} | stack]) do
