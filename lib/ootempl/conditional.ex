@@ -5,6 +5,7 @@ defmodule Ootempl.Conditional do
   Conditional markers allow showing or hiding document sections based on data conditions.
   Markers follow the syntax:
   - `@if:variable@` - Start of conditional section
+  - `@else@` - Alternative content when condition is false (optional)
   - `@endif@` - End of conditional section
 
   Markers are case-insensitive and support nested data paths using dot notation.
@@ -22,18 +23,26 @@ defmodule Ootempl.Conditional do
         %{type: :if, condition: "customer.active", path: ["customer", "active"], position: 0},
         %{type: :endif, condition: nil, path: nil, position: 29}
       ]
+
+      iex> Ootempl.Conditional.detect_conditionals("@if:premium@ VIP @else@ Standard @endif@")
+      [
+        %{type: :if, condition: "premium", path: ["premium"], position: 0},
+        %{type: :else, condition: nil, path: nil, position: 17},
+        %{type: :endif, condition: nil, path: nil, position: 33}
+      ]
   """
 
   require Record
 
   @type conditional :: %{
-          type: :if | :endif,
+          type: :if | :else | :endif,
           condition: String.t() | nil,
           path: [String.t()] | nil,
           position: integer()
         }
 
   @if_pattern ~r/@if:([a-zA-Z_][a-zA-Z0-9_.]*)@/i
+  @else_pattern ~r/@else@/i
   @endif_pattern ~r/@endif@/i
 
   @doc """
@@ -48,7 +57,7 @@ defmodule Ootempl.Conditional do
   ## Returns
 
   A list of conditional maps, each containing:
-  - `:type` - Either `:if` or `:endif`
+  - `:type` - Either `:if`, `:else`, or `:endif`
   - `:condition` - The condition variable (only for `:if` markers)
   - `:path` - Parsed path segments (only for `:if` markers)
   - `:position` - Character position in the text
@@ -63,13 +72,21 @@ defmodule Ootempl.Conditional do
 
       iex> Ootempl.Conditional.detect_conditionals("no markers here")
       []
+
+      iex> Ootempl.Conditional.detect_conditionals("@if:show@yes@else@no@endif@")
+      [
+        %{type: :if, condition: "show", path: ["show"], position: 0},
+        %{type: :else, condition: nil, path: nil, position: 12},
+        %{type: :endif, condition: nil, path: nil, position: 20}
+      ]
   """
   @spec detect_conditionals(String.t()) :: [conditional()]
   def detect_conditionals(text) when is_binary(text) do
     if_markers = find_if_markers(text)
+    else_markers = find_else_markers(text)
     endif_markers = find_endif_markers(text)
 
-    Enum.sort_by(if_markers ++ endif_markers, & &1.position)
+    Enum.sort_by(if_markers ++ else_markers ++ endif_markers, & &1.position)
   end
 
   @spec parse_condition(String.t()) :: [String.t()]
@@ -81,6 +98,8 @@ defmodule Ootempl.Conditional do
   Validates that all conditional markers are properly paired.
 
   Ensures each `@if@` has a corresponding `@endif@` and detects orphaned markers.
+  Also validates that `@else@` markers are properly placed within if/endif blocks
+  and that there is at most one `@else@` per block.
 
   ## Parameters
 
@@ -108,12 +127,24 @@ defmodule Ootempl.Conditional do
       ...>   %{type: :endif, condition: nil, path: nil, position: 0}
       ...> ])
       {:error, "Orphan @endif@ at position 0 (no matching @if@)"}
+
+      iex> Ootempl.Conditional.validate_pairs([
+      ...>   %{type: :else, condition: nil, path: nil, position: 0}
+      ...> ])
+      {:error, "Orphan @else@ at position 0 (no matching @if@)"}
+
+      iex> Ootempl.Conditional.validate_pairs([
+      ...>   %{type: :if, condition: "x", path: ["x"], position: 0},
+      ...>   %{type: :else, condition: nil, path: nil, position: 10},
+      ...>   %{type: :else, condition: nil, path: nil, position: 20},
+      ...>   %{type: :endif, condition: nil, path: nil, position: 30}
+      ...> ])
+      {:error, "Multiple @else@ markers in conditional block starting at position 0"}
   """
   @spec validate_pairs([conditional()]) :: :ok | {:error, String.t()}
   def validate_pairs(conditionals) when is_list(conditionals) do
     validate_pairs_recursive(conditionals, [])
   end
-
 
   @doc """
   Evaluates a conditional expression by checking if the data path resolves to a truthy value.
@@ -269,6 +300,20 @@ defmodule Ootempl.Conditional do
     end)
   end
 
+  @spec find_else_markers(String.t()) :: [conditional()]
+  defp find_else_markers(text) do
+    @else_pattern
+    |> Regex.scan(text, return: :index)
+    |> Enum.map(fn [{position, _length}] ->
+      %{
+        type: :else,
+        condition: nil,
+        path: nil,
+        position: position
+      }
+    end)
+  end
+
   @spec find_endif_markers(String.t()) :: [conditional()]
   defp find_endif_markers(text) do
     @endif_pattern
@@ -283,23 +328,37 @@ defmodule Ootempl.Conditional do
     end)
   end
 
-  @spec validate_pairs_recursive([conditional()], [conditional()]) ::
+  @spec validate_pairs_recursive([conditional()], [{conditional(), boolean()}]) ::
           :ok | {:error, String.t()}
   defp validate_pairs_recursive([], []), do: :ok
 
-  defp validate_pairs_recursive([], [unclosed | _]) do
-    {:error, "Unmatched @if:#{unclosed.condition}@ at position #{unclosed.position}"}
+  defp validate_pairs_recursive([], [{marker, _else_seen} | _]) do
+    {:error, "Unmatched @if:#{marker.condition}@ at position #{marker.position}"}
   end
 
   defp validate_pairs_recursive([%{type: :if} = marker | rest], stack) do
-    validate_pairs_recursive(rest, [marker | stack])
+    # Push if marker with else_seen = false
+    validate_pairs_recursive(rest, [{marker, false} | stack])
+  end
+
+  defp validate_pairs_recursive([%{type: :else} = marker | _rest], []) do
+    {:error, "Orphan @else@ at position #{marker.position} (no matching @if@)"}
+  end
+
+  defp validate_pairs_recursive([%{type: :else} = _marker | rest], [{if_marker, else_seen} | stack_rest]) do
+    if else_seen do
+      {:error, "Multiple @else@ markers in conditional block starting at position #{if_marker.position}"}
+    else
+      # Mark that we've seen an else for this if block
+      validate_pairs_recursive(rest, [{if_marker, true} | stack_rest])
+    end
   end
 
   defp validate_pairs_recursive([%{type: :endif} = marker | _rest], []) do
     {:error, "Orphan @endif@ at position #{marker.position} (no matching @if@)"}
   end
 
-  defp validate_pairs_recursive([%{type: :endif} | rest], [_if_marker | stack]) do
+  defp validate_pairs_recursive([%{type: :endif} | rest], [{_if_marker, _else_seen} | stack]) do
     validate_pairs_recursive(rest, stack)
   end
 

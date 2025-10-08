@@ -205,6 +205,58 @@ defmodule Ootempl.ConditionalTest do
       # Assert
       assert [] = result
     end
+
+    test "detects @else@ markers" do
+      # Arrange
+      text = "Hello @else@ world"
+
+      # Act
+      result = Conditional.detect_conditionals(text)
+
+      # Assert
+      assert [%{type: :else, condition: nil, path: nil, position: 6}] = result
+    end
+
+    test "detects @if@, @else@, and @endif@ markers in order" do
+      # Arrange
+      text = "@if:show@yes@else@no@endif@"
+
+      # Act
+      result = Conditional.detect_conditionals(text)
+
+      # Assert
+      assert [
+               %{type: :if, condition: "show", path: ["show"], position: 0},
+               %{type: :else, condition: nil, path: nil, position: 12},
+               %{type: :endif, condition: nil, path: nil, position: 20}
+             ] = result
+    end
+
+    test "detects case-insensitive @ELSE@ markers" do
+      # Arrange
+      text = "@if:name@ @ELSE@ @endif@"
+
+      # Act
+      result = Conditional.detect_conditionals(text)
+
+      # Assert
+      assert [
+               %{type: :if, condition: "name", path: ["name"], position: 0},
+               %{type: :else, condition: nil, path: nil, position: 10},
+               %{type: :endif, condition: nil, path: nil, position: 17}
+             ] = result
+    end
+
+    test "detects @Else@ with mixed case" do
+      # Arrange
+      text = "@Else@"
+
+      # Act
+      result = Conditional.detect_conditionals(text)
+
+      # Assert
+      assert [%{type: :else, condition: nil, path: nil, position: 0}] = result
+    end
   end
 
   describe "validate_pairs/1" do
@@ -317,6 +369,82 @@ defmodule Ootempl.ConditionalTest do
 
       # Assert
       assert {:error, "Orphan @endif@ at position 18 (no matching @if@)"} = result
+    end
+
+    test "validates properly matched if/else/endif triplet" do
+      # Arrange
+      conditionals = [
+        %{type: :if, condition: "show", path: ["show"], position: 0},
+        %{type: :else, condition: nil, path: nil, position: 13},
+        %{type: :endif, condition: nil, path: nil, position: 22}
+      ]
+
+      # Act
+      result = Conditional.validate_pairs(conditionals)
+
+      # Assert
+      assert :ok = result
+    end
+
+    test "returns error for orphan @else@ without @if@" do
+      # Arrange
+      conditionals = [
+        %{type: :else, condition: nil, path: nil, position: 5}
+      ]
+
+      # Act
+      result = Conditional.validate_pairs(conditionals)
+
+      # Assert
+      assert {:error, "Orphan @else@ at position 5 (no matching @if@)"} = result
+    end
+
+    test "returns error for multiple @else@ in same block" do
+      # Arrange
+      conditionals = [
+        %{type: :if, condition: "x", path: ["x"], position: 0},
+        %{type: :else, condition: nil, path: nil, position: 10},
+        %{type: :else, condition: nil, path: nil, position: 20},
+        %{type: :endif, condition: nil, path: nil, position: 30}
+      ]
+
+      # Act
+      result = Conditional.validate_pairs(conditionals)
+
+      # Assert
+      assert {:error, "Multiple @else@ markers in conditional block starting at position 0"} = result
+    end
+
+    test "validates multiple if/else/endif blocks" do
+      # Arrange
+      conditionals = [
+        %{type: :if, condition: "first", path: ["first"], position: 0},
+        %{type: :else, condition: nil, path: nil, position: 12},
+        %{type: :endif, condition: nil, path: nil, position: 20},
+        %{type: :if, condition: "second", path: ["second"], position: 30},
+        %{type: :else, condition: nil, path: nil, position: 45},
+        %{type: :endif, condition: nil, path: nil, position: 53}
+      ]
+
+      # Act
+      result = Conditional.validate_pairs(conditionals)
+
+      # Assert
+      assert :ok = result
+    end
+
+    test "validates if/endif without else (backward compatibility)" do
+      # Arrange
+      conditionals = [
+        %{type: :if, condition: "show", path: ["show"], position: 0},
+        %{type: :endif, condition: nil, path: nil, position: 13}
+      ]
+
+      # Act
+      result = Conditional.validate_pairs(conditionals)
+
+      # Assert
+      assert :ok = result
     end
   end
 

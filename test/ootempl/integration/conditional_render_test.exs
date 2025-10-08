@@ -377,6 +377,86 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
     end
   end
 
+  describe "if/else conditional sections" do
+    test "shows if section when condition is true" do
+      # Arrange
+      template_path = Path.join(@output_dir, "if_else_true_template.docx")
+      output_path = Path.join(@output_dir, "if_else_true_output.docx")
+      create_conditional_if_else_docx(template_path)
+
+      data = %{"is_premium" => true}
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      assert File.exists?(output_path)
+
+      # Verify output is valid .docx
+      assert :ok = Ootempl.Validator.validate_docx(output_path)
+
+      # Verify if section was kept, else section and markers removed
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
+      assert output_xml =~ "Dear Customer,"
+      assert output_xml =~ "Thank you for being a premium member! You get 20% off."
+      refute output_xml =~ "Become a premium member today for 20% off all purchases."
+      assert output_xml =~ "Thank you!"
+      refute output_xml =~ "@if:is_premium@"
+      refute output_xml =~ "@else@"
+      refute output_xml =~ "@endif@"
+    end
+
+    test "shows else section when condition is false" do
+      # Arrange
+      template_path = Path.join(@output_dir, "if_else_false_template.docx")
+      output_path = Path.join(@output_dir, "if_else_false_output.docx")
+      create_conditional_if_else_docx(template_path)
+
+      data = %{"is_premium" => false}
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+      assert File.exists?(output_path)
+
+      # Verify output is valid .docx
+      assert :ok = Ootempl.Validator.validate_docx(output_path)
+
+      # Verify else section was kept, if section and markers removed
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
+      assert output_xml =~ "Dear Customer,"
+      refute output_xml =~ "Thank you for being a premium member! You get 20% off."
+      assert output_xml =~ "Become a premium member today for 20% off all purchases."
+      assert output_xml =~ "Thank you!"
+      refute output_xml =~ "@if:is_premium@"
+      refute output_xml =~ "@else@"
+      refute output_xml =~ "@endif@"
+    end
+
+    test "handles falsy values correctly in if/else" do
+      # Arrange
+      template_path = Path.join(@output_dir, "if_else_zero_template.docx")
+      output_path = Path.join(@output_dir, "if_else_zero_output.docx")
+      create_conditional_if_else_docx(template_path)
+
+      data = %{"is_premium" => 0}
+
+      # Act
+      result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert result == :ok
+
+      # Verify else section was kept (0 is falsy)
+      {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
+      assert output_xml =~ "Become a premium member today for 20% off all purchases."
+      refute output_xml =~ "Thank you for being a premium member! You get 20% off."
+    end
+  end
+
   # Note: Case-insensitive marker text matching is a known limitation.
   # Markers are detected case-insensitively, but the exact case must match when searching paragraphs.
   # This is tracked as technical debt for future improvement.
