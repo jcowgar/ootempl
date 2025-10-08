@@ -1,6 +1,6 @@
 defmodule Ootempl.Relationships do
   @moduledoc """
-  Manages relationship XML for Office documents.
+  Manages relationship XML for Office Open XML documents.
 
   This module provides functions to parse, modify, and generate relationship IDs
   in `.docx` relationship files (`word/_rels/document.xml.rels`). Relationships

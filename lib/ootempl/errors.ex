@@ -37,7 +37,7 @@ defmodule Ootempl.MissingFileError do
 
   This error indicates that the .docx file structure is incomplete. All .docx
   files must contain certain files like `word/document.xml`, `[Content_Types].xml`,
-  and `_rels/.rels` to be valid Office documents.
+  and `_rels/.rels` to be valid Office Open XML documents.
   """
   defexception [:message, :path, :missing_file]
 

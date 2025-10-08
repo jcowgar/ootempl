@@ -3,7 +3,7 @@ defmodule Ootempl.Xml do
   XML manipulation utilities for working with Erlang's `:xmerl` library.
 
   This module provides Elixir-friendly wrappers around `:xmerl` record structures,
-  enabling type-safe XML operations for parsing and manipulating Office document XML.
+  enabling type-safe XML operations for parsing and manipulating Office Open XML document XML.
 
   ## Record Structures
 

@@ -8,7 +8,7 @@ defmodule Ootempl.MixProject do
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      description: "Office document templating library for Elixir",
+      description: "Office Open XML document templating library for Elixir",
       package: package(),
       docs: docs()
     ]

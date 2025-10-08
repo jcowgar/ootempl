@@ -1,6 +1,6 @@
 defmodule Ootempl do
   @moduledoc """
-  Office document templating library for Elixir.
+  Office Open XML document templating library for Elixir.
 
   Ootempl enables programmatic manipulation of Microsoft Word documents (.docx)
   by replacing placeholders with dynamic content to generate customized documents

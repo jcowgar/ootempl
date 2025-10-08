@@ -1,6 +1,6 @@
 # Ootempl
 
-Office document templating library for Elixir. Generate customized Word documents by replacing placeholders in templates with dynamic data.
+Office Open XML document templating library for Elixir. Generate customized Word documents by replacing placeholders in templates with dynamic data.
 
 ## Features
 

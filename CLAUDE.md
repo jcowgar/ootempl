@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Ootempl is an Elixir library for working with Office document templates. The primary goal is to enable programmatic manipulation of Word documents (and eventually Excel spreadsheets) by replacing placeholders with dynamic content to generate customized documents from templates.
+Ootempl is an Elixir library for working with Office Open XML document templates. The primary goal is to enable programmatic manipulation of Word documents (and eventually Excel spreadsheets) by replacing placeholders with dynamic content to generate customized documents from templates.
 
 ## Current Status
 
