@@ -270,4 +270,55 @@ defmodule Ootempl.FixtureHelper do
     </w:document>
     """
   end
+
+  @doc """
+  Creates a .docx file with if/else conditional sections for testing.
+
+  Returns the path to the created fixture file.
+  """
+  @spec create_conditional_if_else_docx(Path.t()) :: Path.t()
+  def create_conditional_if_else_docx(output_path) do
+    file_map = %{
+      "[Content_Types].xml" => content_types_xml(),
+      "_rels/.rels" => rels_xml(),
+      "word/document.xml" => conditional_if_else_document_xml(),
+      "word/_rels/document.xml.rels" => document_rels_xml()
+    }
+
+    case Ootempl.Archive.create(file_map, output_path) do
+      :ok -> output_path
+      {:error, reason} -> raise "Failed to create fixture: #{inspect(reason)}"
+    end
+  end
+
+  defp conditional_if_else_document_xml do
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body>
+        <w:p>
+          <w:r><w:t>Dear Customer,</w:t></w:r>
+        </w:p>
+        <w:p>
+          <w:r><w:t>@if:is_premium@</w:t></w:r>
+        </w:p>
+        <w:p>
+          <w:r><w:t>Thank you for being a premium member! You get 20% off.</w:t></w:r>
+        </w:p>
+        <w:p>
+          <w:r><w:t>@else@</w:t></w:r>
+        </w:p>
+        <w:p>
+          <w:r><w:t>Become a premium member today for 20% off all purchases.</w:t></w:r>
+        </w:p>
+        <w:p>
+          <w:r><w:t>@endif@</w:t></w:r>
+        </w:p>
+        <w:p>
+          <w:r><w:t>Thank you!</w:t></w:r>
+        </w:p>
+      </w:body>
+    </w:document>
+    """
+  end
 end

@@ -170,13 +170,39 @@ defmodule Ootempl do
   # Generated document includes disclaimer section, excludes pricing section
   ```
 
+  **If/Else Support:**
+
+  Use `@else@` markers to show alternative content when a condition is false:
+
+  ```elixir
+  # Template structure:
+  # Dear Customer,
+  #
+  # @if:is_premium@
+  # Thank you for being a premium member! You get 20% off.
+  # @else@
+  # Become a premium member today for 20% off all purchases.
+  # @endif@
+  #
+  # Thank you!
+
+  data_premium = %{"is_premium" => true}
+  Ootempl.render("letter.docx", data_premium, "premium_letter.docx")
+  # Output: "Thank you for being a premium member! You get 20% off."
+
+  data_standard = %{"is_premium" => false}
+  Ootempl.render("letter.docx", data_standard, "standard_letter.docx")
+  # Output: "Become a premium member today for 20% off all purchases."
+  ```
+
   **Truthiness rules:**
   - **Truthy**: non-nil, non-false, non-empty string, non-zero number
   - **Falsy**: `nil`, `false`, `""` (empty string), `0`, `0.0`
 
   **Conditional features:**
-  - Case-insensitive markers: `@IF:name@`, `@if:NAME@` both work
+  - Case-insensitive markers: `@IF:name@`, `@if:NAME@`, `@ELSE@` all work
   - Nested data paths: `@if:customer.active@`
+  - Optional `@else@` for alternative content
   - Multi-paragraph sections supported
   - Sections can contain tables, images, lists, etc.
 
@@ -772,66 +798,69 @@ defmodule Ootempl do
     end
   end
 
-  # Groups conditional markers into if/endif pairs
+  # Groups conditional markers into if/else/endif triplets (or if/endif pairs if no else)
   @spec group_conditional_pairs([Conditional.conditional()]) ::
-          [%{if: Conditional.conditional(), endif: Conditional.conditional()}]
+          [%{if: Conditional.conditional(), else: Conditional.conditional() | nil, endif: Conditional.conditional()}]
   defp group_conditional_pairs(conditionals) do
     do_group_pairs(conditionals, [], [])
   end
 
   @spec do_group_pairs(
           [Conditional.conditional()],
-          [Conditional.conditional()],
-          [%{if: Conditional.conditional(), endif: Conditional.conditional()}]
-        ) :: [%{if: Conditional.conditional(), endif: Conditional.conditional()}]
+          [{Conditional.conditional(), Conditional.conditional() | nil}],
+          [%{if: Conditional.conditional(), else: Conditional.conditional() | nil, endif: Conditional.conditional()}]
+        ) :: [%{if: Conditional.conditional(), else: Conditional.conditional() | nil, endif: Conditional.conditional()}]
   defp do_group_pairs([], _stack, pairs), do: Enum.reverse(pairs)
 
   defp do_group_pairs([%{type: :if} = marker | rest], stack, pairs) do
-    do_group_pairs(rest, [marker | stack], pairs)
+    # Push if marker with no else marker yet
+    do_group_pairs(rest, [{marker, nil} | stack], pairs)
   end
 
-  defp do_group_pairs([%{type: :endif} = marker | rest], [if_marker | stack], pairs) do
-    pair = %{if: if_marker, endif: marker}
+  defp do_group_pairs([%{type: :else} = marker | rest], [{if_marker, _} | stack_rest], pairs) do
+    # Update the top of stack to include the else marker
+    do_group_pairs(rest, [{if_marker, marker} | stack_rest], pairs)
+  end
+
+  defp do_group_pairs([%{type: :endif} = marker | rest], [{if_marker, else_marker} | stack], pairs) do
+    pair = %{if: if_marker, else: else_marker, endif: marker}
     do_group_pairs(rest, stack, [pair | pairs])
   end
 
-  # Processes a single conditional pair
+  # Processes a single conditional (if/else/endif or if/endif)
   @spec process_single_conditional(
           Xml.xml_element(),
-          %{if: Conditional.conditional(), endif: Conditional.conditional()},
+          %{if: Conditional.conditional(), else: Conditional.conditional() | nil, endif: Conditional.conditional()},
           map()
         ) :: {:ok, Xml.xml_element()} | {:error, term()}
-  defp process_single_conditional(xml_doc, %{if: if_marker, endif: endif_marker} = pair, data) do
+  defp process_single_conditional(xml_doc, %{if: if_marker, else: else_marker, endif: endif_marker} = pair, data) do
     # Evaluate the condition
     case Conditional.evaluate_condition(if_marker.path, data) do
       {:ok, true} ->
-        # Condition is true: keep content, remove markers
-        remove_conditional_markers(xml_doc, pair)
+        # Condition is true: keep if section, remove else section (if present)
+        remove_conditional_markers_and_else_section(xml_doc, pair)
 
       {:ok, false} ->
-        # Condition is false: remove entire section
-        # Pass both markers to help identify the correct pair
-        remove_conditional_section(xml_doc, if_marker, endif_marker)
+        # Condition is false: remove if section, keep else section (if present)
+        remove_if_section_keep_else(xml_doc, if_marker, else_marker, endif_marker)
 
       {:error, reason} ->
         {:error, {:conditional_evaluation_failed, if_marker.condition, reason}}
     end
   end
 
-  # Removes conditional markers (when condition is true)
-  @spec remove_conditional_markers(
+  # Removes conditional markers and else section (when condition is true)
+  @spec remove_conditional_markers_and_else_section(
           Xml.xml_element(),
-          %{if: Conditional.conditional(), endif: Conditional.conditional()}
-        ) :: {:ok, Xml.xml_element()}
-  defp remove_conditional_markers(xml_doc, %{if: if_marker, endif: _endif_marker}) do
-    # Build marker strings
+          %{if: Conditional.conditional(), else: Conditional.conditional() | nil, endif: Conditional.conditional()}
+        ) :: {:ok, Xml.xml_element()} | {:error, term()}
+  defp remove_conditional_markers_and_else_section(xml_doc, %{if: if_marker, else: nil, endif: _endif_marker}) do
+    # No else section: just remove the if and endif markers
     if_marker_text = "@if:#{if_marker.condition}@"
     endif_marker_text = "@endif@"
 
-    # Find the specific paragraphs containing these markers
     case Conditional.find_section_boundaries(xml_doc, if_marker_text, endif_marker_text) do
       {:ok, {start_para, end_para}} ->
-        # Remove only the marker paragraphs (not the content between them)
         modified_doc = Xml.remove_nodes(xml_doc, [start_para, end_para])
         {:ok, modified_doc}
 
@@ -840,27 +869,45 @@ defmodule Ootempl do
     end
   end
 
-  # Removes entire conditional section (when condition is false)
-  @spec remove_conditional_section(
+  defp remove_conditional_markers_and_else_section(
+         xml_doc,
+         %{if: if_marker, else: _else_marker, endif: _endif_marker}
+       ) do
+    # Has else section: remove if marker, remove entire else section through endif
+    if_marker_text = "@if:#{if_marker.condition}@"
+    else_marker_text = "@else@"
+    endif_marker_text = "@endif@"
+
+    with {:ok, if_para} <- find_paragraph(xml_doc, if_marker_text),
+         {:ok, {else_para, endif_para}} <-
+           Conditional.find_section_boundaries(xml_doc, else_marker_text, endif_marker_text),
+         {:ok, nodes_to_remove} <- collect_else_section_nodes(xml_doc, else_para, endif_para) do
+      # Remove if marker paragraph and all nodes from else through endif
+      modified_doc = Xml.remove_nodes(xml_doc, [if_para | nodes_to_remove])
+      {:ok, modified_doc}
+    else
+      {:error, reason} -> {:error, {:marker_removal_failed, reason}}
+    end
+  end
+
+  # Removes if section and keeps else section (when condition is false)
+  @spec remove_if_section_keep_else(
           Xml.xml_element(),
           Conditional.conditional(),
+          Conditional.conditional() | nil,
           Conditional.conditional()
         ) :: {:ok, Xml.xml_element()} | {:error, term()}
-  defp remove_conditional_section(xml_doc, if_marker, _endif_marker) do
-    # Build marker strings
+  defp remove_if_section_keep_else(xml_doc, if_marker, nil, _endif_marker) do
+    # No else section: remove entire if/endif section
     if_marker_text = "@if:#{if_marker.condition}@"
     endif_marker_text = "@endif@"
 
-    # Find section boundaries
     case Conditional.find_section_boundaries(xml_doc, if_marker_text, endif_marker_text) do
       {:ok, {start_para, end_para}} ->
-        # Find the body element that contains the paragraphs
         body_element = find_body_element(xml_doc)
 
-        # Collect all nodes in the section from the body
         case Conditional.collect_section_nodes(body_element, start_para, end_para) do
           {:ok, nodes_to_remove} ->
-            # Remove all nodes in the section
             modified_doc = Xml.remove_nodes(xml_doc, nodes_to_remove)
             {:ok, modified_doc}
 
@@ -871,6 +918,107 @@ defmodule Ootempl do
       {:error, reason} ->
         {:error, {:section_boundary_not_found, if_marker.condition, reason}}
     end
+  end
+
+  defp remove_if_section_keep_else(xml_doc, if_marker, _else_marker, _endif_marker) do
+    # Has else section: remove if section through else, remove else and endif markers
+    if_marker_text = "@if:#{if_marker.condition}@"
+    else_marker_text = "@else@"
+    endif_marker_text = "@endif@"
+
+    with {:ok, {if_para, else_para}} <- Conditional.find_section_boundaries(xml_doc, if_marker_text, else_marker_text),
+         {:ok, endif_para} <- find_paragraph(xml_doc, endif_marker_text),
+         {:ok, if_section_nodes} <- collect_if_section_nodes(xml_doc, if_para, else_para) do
+      # Remove if section (if through else) and endif marker
+      modified_doc = Xml.remove_nodes(xml_doc, if_section_nodes ++ [endif_para])
+      {:ok, modified_doc}
+    else
+      {:error, reason} -> {:error, {:section_boundary_not_found, if_marker.condition, reason}}
+    end
+  end
+
+  # Finds a paragraph containing specific text
+  @spec find_paragraph(Xml.xml_element(), String.t()) ::
+          {:ok, Xml.xml_element()} | {:error, :not_found}
+  defp find_paragraph(xml_doc, text) do
+    import Xml
+
+    case Enum.find(find_all_paragraphs(xml_doc), fn para ->
+           paragraph_contains_text?(para, text)
+         end) do
+      nil -> {:error, :not_found}
+      para -> {:ok, para}
+    end
+  end
+
+  # Collects nodes from else paragraph through endif paragraph (inclusive)
+  @spec collect_else_section_nodes(Xml.xml_element(), Xml.xml_element(), Xml.xml_element()) ::
+          {:ok, [Xml.xml_node()]} | {:error, term()}
+  defp collect_else_section_nodes(xml_doc, else_para, endif_para) do
+    body_element = find_body_element(xml_doc)
+    Conditional.collect_section_nodes(body_element, else_para, endif_para)
+  end
+
+  # Collects nodes from if paragraph through else paragraph (inclusive)
+  @spec collect_if_section_nodes(Xml.xml_element(), Xml.xml_element(), Xml.xml_element()) ::
+          {:ok, [Xml.xml_node()]} | {:error, term()}
+  defp collect_if_section_nodes(xml_doc, if_para, else_para) do
+    body_element = find_body_element(xml_doc)
+    Conditional.collect_section_nodes(body_element, if_para, else_para)
+  end
+
+  # Helper to find all paragraphs in a document
+  @spec find_all_paragraphs(Xml.xml_element()) :: [Xml.xml_element()]
+  defp find_all_paragraphs(xml_element) do
+    import Xml
+
+    children = xmlElement(xml_element, :content)
+    Enum.flat_map(children, &collect_paragraph_from_node/1)
+  end
+
+  @spec collect_paragraph_from_node(Xml.xml_node()) :: [Xml.xml_element()]
+  defp collect_paragraph_from_node(node) do
+    import Xml
+    require Record
+
+    cond do
+      not Record.is_record(node, :xmlElement) -> []
+      xmlElement(node, :name) == :"w:p" -> [node]
+      true -> find_all_paragraphs(node)
+    end
+  end
+
+  # Helper to check if paragraph contains text
+  @spec paragraph_contains_text?(Xml.xml_element(), String.t()) :: boolean()
+  defp paragraph_contains_text?(paragraph, text) do
+    import Xml
+
+    paragraph
+    |> extract_text_from_element()
+    |> String.contains?(text)
+  end
+
+  # Helper to extract text from an element
+  @spec extract_text_from_element(Xml.xml_element()) :: String.t()
+  defp extract_text_from_element(element) do
+    import Xml
+
+    require Record
+
+    children = xmlElement(element, :content)
+
+    Enum.map_join(children, fn node ->
+      cond do
+        Record.is_record(node, :xmlText) ->
+          node |> xmlText(:value) |> List.to_string()
+
+        Record.is_record(node, :xmlElement) ->
+          extract_text_from_element(node)
+
+        true ->
+          ""
+      end
+    end)
   end
 
   # Finds the w:body element in the document
