@@ -121,7 +121,6 @@ defmodule Ootempl.Xml do
     :exit, reason -> {:error, reason}
   end
 
-
   @doc """
   Removes a list of nodes from an XML element.
 

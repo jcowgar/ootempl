@@ -139,7 +139,7 @@ defmodule Ootempl.ImageReplacementTest do
       result = Ootempl.render(template_path, data, output_path)
 
       # Assert
-      assert {:error, {:file_processing_failed, "word/document.xml", %Ootempl.ImageError{} = error}} = result
+      assert {:error, %Ootempl.ImageError{} = error} = result
       assert error.placeholder_name == "logo"
       assert error.image_path == nil
       assert error.reason == :image_not_found_in_data
@@ -164,7 +164,7 @@ defmodule Ootempl.ImageReplacementTest do
       result = Ootempl.render(template_path, data, output_path)
 
       # Assert
-      assert {:error, {:file_processing_failed, "word/document.xml", %Ootempl.ImageError{} = error}} = result
+      assert {:error, %Ootempl.ImageError{} = error} = result
       assert error.placeholder_name == "logo"
       assert error.image_path == "/path/to/nonexistent/image.png"
       assert error.reason == :file_not_found
@@ -193,7 +193,7 @@ defmodule Ootempl.ImageReplacementTest do
       result = Ootempl.render(template_path, data, output_path)
 
       # Assert
-      assert {:error, {:file_processing_failed, "word/document.xml", %Ootempl.ImageError{} = error}} = result
+      assert {:error, %Ootempl.ImageError{} = error} = result
       assert error.placeholder_name == "logo"
       assert error.image_path == bmp_path
       assert error.reason == :unsupported_format

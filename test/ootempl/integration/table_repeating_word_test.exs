@@ -10,6 +10,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
   """
 
   use ExUnit.Case
+
   import Ootempl.Xml
 
   @template_path "test/fixtures/Table Repeating Rows from Word.docx"

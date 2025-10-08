@@ -34,7 +34,8 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       result = Ootempl.render(template_path, %{}, output_path)
 
       # Assert
-      assert {:error, %Ootempl.PlaceholderError{
+      assert {:error,
+              %Ootempl.PlaceholderError{
                 placeholders: [%{placeholder: "@name@"}]
               } = placeholder_error} = result
 
@@ -73,7 +74,8 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       result = Ootempl.render(template_path, %{"other" => "data"}, output_path)
 
       # Assert
-      assert {:error, %Ootempl.PlaceholderError{
+      assert {:error,
+              %Ootempl.PlaceholderError{
                 placeholders: [%{placeholder: "@person.name@", reason: {:path_not_found, ["person", "name"]}}]
               }} = result
     end
@@ -89,7 +91,8 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       result = Ootempl.render(template_path, %{"items" => "not a list"}, output_path)
 
       # Assert
-      assert {:error, %Ootempl.PlaceholderError{
+      assert {:error,
+              %Ootempl.PlaceholderError{
                 placeholders: [%{placeholder: "@items.0@"}]
               }} = result
     end
@@ -105,7 +108,8 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       result = Ootempl.render(template_path, %{"items" => ["a", "b"]}, output_path)
 
       # Assert
-      assert {:error, %Ootempl.PlaceholderError{
+      assert {:error,
+              %Ootempl.PlaceholderError{
                 placeholders: [%{placeholder: "@items.5@"}]
               }} = result
     end
@@ -121,7 +125,8 @@ defmodule Ootempl.Integration.PlaceholderErrorTest do
       result = Ootempl.render(template_path, %{"name" => nil}, output_path)
 
       # Assert
-      assert {:error, %Ootempl.PlaceholderError{
+      assert {:error,
+              %Ootempl.PlaceholderError{
                 placeholders: [%{placeholder: "@name@", reason: :nil_value}]
               }} = result
     end

@@ -573,5 +573,4 @@ defmodule Ootempl.DataAccessTest do
       assert result == {:ok, "9999999999999"}
     end
   end
-
 end

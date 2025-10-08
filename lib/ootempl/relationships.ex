@@ -47,6 +47,7 @@ defmodule Ootempl.Relationships do
   """
 
   import Ootempl.Xml
+
   require Record
 
   @type relationship :: %{
@@ -245,5 +246,4 @@ defmodule Ootempl.Relationships do
       _ -> 0
     end
   end
-
 end

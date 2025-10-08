@@ -8,6 +8,7 @@ defmodule Ootempl.Integration.RenderTest do
   """
 
   use ExUnit.Case
+
   import Ootempl.Xml
 
   @test_fixture "test/fixtures/Simple Placeholdes from Word.docx"

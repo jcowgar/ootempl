@@ -34,7 +34,7 @@ defmodule Ootempl.Integration.ImageErrorTest do
       result = Ootempl.render(template_path, %{}, output_path)
 
       # Assert
-      assert {:error, {:file_processing_failed, "word/document.xml", image_error}} = result
+      assert {:error, image_error} = result
 
       assert %Ootempl.ImageError{
                reason: :image_not_found_in_data,
@@ -59,7 +59,7 @@ defmodule Ootempl.Integration.ImageErrorTest do
       result = Ootempl.render(template_path, data, output_path)
 
       # Assert
-      assert {:error, {:file_processing_failed, "word/document.xml", image_error}} = result
+      assert {:error, image_error} = result
 
       assert %Ootempl.ImageError{
                reason: :file_not_found,
@@ -90,7 +90,7 @@ defmodule Ootempl.Integration.ImageErrorTest do
       File.chmod!(unreadable_path, 0o644)
 
       # Assert
-      assert {:error, {:file_processing_failed, "word/document.xml", image_error}} = result
+      assert {:error, image_error} = result
 
       assert %Ootempl.ImageError{
                reason: :file_not_readable,
@@ -116,7 +116,7 @@ defmodule Ootempl.Integration.ImageErrorTest do
       result = Ootempl.render(template_path, data, output_path)
 
       # Assert
-      assert {:error, {:file_processing_failed, "word/document.xml", image_error}} = result
+      assert {:error, image_error} = result
 
       assert %Ootempl.ImageError{
                reason: :unsupported_format,
@@ -144,7 +144,7 @@ defmodule Ootempl.Integration.ImageErrorTest do
       result = Ootempl.render(template_path, data, output_path)
 
       # Assert - corrupt PNG will return :invalid_image_format or :cannot_read_dimensions
-      assert {:error, {:file_processing_failed, "word/document.xml", image_error}} = result
+      assert {:error, image_error} = result
 
       assert %Ootempl.ImageError{
                placeholder_name: "avatar",

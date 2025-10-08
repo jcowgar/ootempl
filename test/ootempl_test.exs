@@ -1014,4 +1014,504 @@ defmodule OotemplTest do
       if File.exists?(output_path), do: File.rm!(output_path)
     end
   end
+
+  describe "validate/2 with file path" do
+    test "returns :ok for valid template and complete data" do
+      # Arrange
+      template_path = @test_fixture
+      data = @valid_data
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert result == :ok
+    end
+
+    test "returns PlaceholderError for missing data" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{}
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert {:error, %Ootempl.PlaceholderError{}} = result
+    end
+
+    test "returns error for non-existent template file" do
+      # Arrange
+      template_path = "nonexistent.docx"
+      data = @valid_data
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert {:error, %Ootempl.ValidationError{reason: :file_not_found}} = result
+    end
+
+    test "returns error for invalid .docx file" do
+      # Arrange
+      invalid_path = "test/fixtures/invalid_for_validate.txt"
+      File.write!(invalid_path, "This is not a .docx file")
+      data = @valid_data
+
+      on_exit(fn -> File.rm(invalid_path) end)
+
+      # Act
+      result = Ootempl.validate(invalid_path, data)
+
+      # Assert
+      assert {:error, _} = result
+    end
+
+    test "cleans up temp directory after validation" do
+      # Arrange
+      template_path = @test_fixture
+      data = @valid_data
+      temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
+
+      temp_dirs_before =
+        temp_dir_pattern
+        |> Path.wildcard()
+        |> Enum.filter(&File.dir?/1)
+        |> length()
+
+      # Act
+      Ootempl.validate(template_path, data)
+
+      # Assert - no temp directories leaked
+      temp_dirs_after =
+        temp_dir_pattern
+        |> Path.wildcard()
+        |> Enum.filter(&File.dir?/1)
+        |> length()
+
+      assert temp_dirs_after == temp_dirs_before
+    end
+
+    test "cleans up temp directory even on validation error" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{}
+      temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
+
+      temp_dirs_before =
+        temp_dir_pattern
+        |> Path.wildcard()
+        |> Enum.filter(&File.dir?/1)
+        |> length()
+
+      # Act - this will fail due to missing data
+      Ootempl.validate(template_path, data)
+
+      # Assert - cleanup still happened
+      temp_dirs_after =
+        temp_dir_pattern
+        |> Path.wildcard()
+        |> Enum.filter(&File.dir?/1)
+        |> length()
+
+      assert temp_dirs_after == temp_dirs_before
+    end
+
+    test "does not create output files" do
+      # Arrange
+      template_path = @test_fixture
+      data = @valid_data
+      # Check that no output files are created anywhere
+      output_pattern = "test/fixtures/output*.docx"
+      files_before = Path.wildcard(output_pattern)
+
+      # Act
+      Ootempl.validate(template_path, data)
+
+      # Assert - no new files created
+      files_after = Path.wildcard(output_pattern)
+      assert files_after == files_before
+    end
+
+    test "validates template with struct data" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{person: %{first_name: "Struct User"}, date: "2025-10-07"}
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert result == :ok
+    end
+
+    test "validates template with nested data" do
+      # Arrange
+      template_path = @test_fixture
+
+      data = %{
+        "person" => %{"first_name" => "Nested User"},
+        "date" => "2025-10-07"
+      }
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert result == :ok
+    end
+  end
+
+  describe "validate/2 with pre-loaded template" do
+    test "returns :ok for valid template and complete data" do
+      # Arrange
+      {:ok, template} = Ootempl.load(@test_fixture)
+      data = @valid_data
+
+      # Act
+      result = Ootempl.validate(template, data)
+
+      # Assert
+      assert result == :ok
+    end
+
+    test "returns PlaceholderError for missing data" do
+      # Arrange
+      {:ok, template} = Ootempl.load(@test_fixture)
+      data = %{}
+
+      # Act
+      result = Ootempl.validate(template, data)
+
+      # Assert
+      assert {:error, %Ootempl.PlaceholderError{}} = result
+    end
+
+    test "does not modify original template struct" do
+      # Arrange
+      {:ok, template} = Ootempl.load(@test_fixture)
+      data = @valid_data
+
+      # Act
+      result1 = Ootempl.validate(template, data)
+      result2 = Ootempl.validate(template, data)
+
+      # Assert - both validations succeed, template reusable
+      assert result1 == :ok
+      assert result2 == :ok
+    end
+
+    test "can validate multiple times with different data" do
+      # Arrange
+      {:ok, template} = Ootempl.load(@test_fixture)
+      data1 = %{"person" => %{"first_name" => "First"}, "date" => "2025-01-01"}
+      data2 = %{"person" => %{"first_name" => "Second"}, "date" => "2025-02-02"}
+      data3 = %{}
+
+      # Act
+      result1 = Ootempl.validate(template, data1)
+      result2 = Ootempl.validate(template, data2)
+      result3 = Ootempl.validate(template, data3)
+
+      # Assert
+      assert result1 == :ok
+      assert result2 == :ok
+      assert {:error, %Ootempl.PlaceholderError{}} = result3
+    end
+
+    test "validates without creating files" do
+      # Arrange
+      {:ok, template} = Ootempl.load(@test_fixture)
+      data = @valid_data
+      output_pattern = "test/fixtures/*.docx"
+      files_before = Path.wildcard(output_pattern)
+
+      # Act
+      Ootempl.validate(template, data)
+
+      # Assert - no new files created
+      files_after = Path.wildcard(output_pattern)
+      assert files_after == files_before
+    end
+  end
+
+  describe "validate/2 with conditionals" do
+    test "validates template with conditional sections" do
+      # Arrange - create template with conditionals
+      template_path = "test/fixtures/conditional_validate.docx"
+
+      file_map = %{
+        "word/document.xml" => """
+        <?xml version="1.0"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:r><w:t>@if:show_section@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>This section is shown when show_section is true</w:t></w:r></w:p>
+            <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Name: @name@</w:t></w:r></w:p>
+          </w:body>
+        </w:document>
+        """,
+        "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+        "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+      }
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn -> File.rm(template_path) end)
+
+      data = %{"show_section" => true, "name" => "Test"}
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert result == :ok
+    end
+
+    test "validates template with false conditional" do
+      # Arrange - create template with conditionals
+      template_path = "test/fixtures/conditional_false_validate.docx"
+
+      file_map = %{
+        "word/document.xml" => """
+        <?xml version="1.0"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:r><w:t>@if:show_section@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Hidden content</w:t></w:r></w:p>
+            <w:p><w:r><w:t>@endif@</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Name: @name@</w:t></w:r></w:p>
+          </w:body>
+        </w:document>
+        """,
+        "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
+        "_rels/.rels" => "<?xml version=\"1.0\"?><Relationships></Relationships>"
+      }
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn -> File.rm(template_path) end)
+
+      data = %{"show_section" => false, "name" => "Test"}
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert result == :ok
+    end
+  end
+
+  describe "validate/2 cleanup edge cases" do
+    test "handles cleanup error gracefully" do
+      # Arrange
+      template_path = @test_fixture
+      data = @valid_data
+
+      # Act - normal validate should succeed
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert result == :ok
+    end
+  end
+
+  describe "validate/2 with image placeholders" do
+    test "returns ImageError for missing image data (file path)" do
+      # Arrange - template with image placeholder
+      template_path = "test/fixtures/image_validate_missing.docx"
+
+      file_map = OotemplTestHelpers.create_template_with_image(%{
+        image_name: "logo",
+        rel_id: "rId1"
+      })
+
+      Ootempl.Archive.create(file_map, template_path)
+      on_exit(fn -> File.rm(template_path) end)
+
+      # Data missing the "logo" key
+      data = %{"name" => "Test"}
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert {:error, %Ootempl.ImageError{reason: :image_not_found_in_data}} = result
+    end
+
+    test "returns ImageError for missing image file (file path)" do
+      # Arrange
+      template_path = "test/fixtures/image_validate_file_missing.docx"
+
+      file_map = OotemplTestHelpers.create_template_with_image(%{
+        image_name: "logo",
+        rel_id: "rId1"
+      })
+
+      Ootempl.Archive.create(file_map, template_path)
+      on_exit(fn -> File.rm(template_path) end)
+
+      # Data with non-existent image file
+      data = %{"logo" => "nonexistent.png"}
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert {:error, %Ootempl.ImageError{reason: :file_not_found}} = result
+    end
+
+    test "returns ImageError for missing image data (pre-loaded template)" do
+      # Arrange
+      template_path = "test/fixtures/image_validate_preloaded_missing.docx"
+
+      file_map = OotemplTestHelpers.create_template_with_image(%{
+        image_name: "logo",
+        rel_id: "rId1"
+      })
+
+      Ootempl.Archive.create(file_map, template_path)
+      on_exit(fn -> File.rm(template_path) end)
+
+      {:ok, template} = Ootempl.load(template_path)
+
+      # Data missing the "logo" key
+      data = %{"name" => "Test"}
+
+      # Act
+      result = Ootempl.validate(template, data)
+
+      # Assert - THIS SHOULD FAIL and expose the gap
+      assert {:error, %Ootempl.ImageError{reason: :image_not_found_in_data}} = result
+    end
+
+    test "returns ImageError for missing image file (pre-loaded template)" do
+      # Arrange
+      template_path = "test/fixtures/image_validate_preloaded_file.docx"
+
+      file_map = OotemplTestHelpers.create_template_with_image(%{
+        image_name: "logo",
+        rel_id: "rId1"
+      })
+
+      Ootempl.Archive.create(file_map, template_path)
+      on_exit(fn -> File.rm(template_path) end)
+
+      {:ok, template} = Ootempl.load(template_path)
+
+      # Data with non-existent image file
+      data = %{"logo" => "nonexistent.png"}
+
+      # Act
+      result = Ootempl.validate(template, data)
+
+      # Assert - THIS SHOULD FAIL and expose the gap
+      assert {:error, %Ootempl.ImageError{reason: :file_not_found}} = result
+    end
+
+    test "validates successfully with valid image (file path)" do
+      # Arrange
+      template_path = "test/fixtures/image_validate_success.docx"
+      image_path = "test/fixtures/test_image.png"
+
+      # Create a simple 1x1 PNG image
+      File.write!(image_path, <<137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+                                 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0,
+                                 0, 0, 12, 73, 68, 65, 84, 8, 215, 99, 248, 15, 0, 0, 1, 1, 1,
+                                 0, 24, 221, 141, 176, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130>>)
+
+      file_map = OotemplTestHelpers.create_template_with_image(%{
+        image_name: "logo",
+        rel_id: "rId1"
+      })
+
+      Ootempl.Archive.create(file_map, template_path)
+
+      on_exit(fn ->
+        File.rm(template_path)
+        File.rm(image_path)
+      end)
+
+      data = %{"logo" => image_path}
+
+      # Act
+      result = Ootempl.validate(template_path, data)
+
+      # Assert
+      assert result == :ok
+    end
+  end
+
+  describe "validate/2 integration with render/3" do
+    test "validate succeeds then render succeeds" do
+      # Arrange
+      template_path = @test_fixture
+      data = @valid_data
+      output_path = "test/fixtures/validate_then_render.docx"
+
+      on_exit(fn -> File.rm(output_path) end)
+
+      # Act
+      validate_result = Ootempl.validate(template_path, data)
+      render_result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert validate_result == :ok
+      assert render_result == :ok
+      assert File.exists?(output_path)
+    end
+
+    test "validate fails then render also fails" do
+      # Arrange
+      template_path = @test_fixture
+      data = %{}
+      output_path = "test/fixtures/validate_fail_render_fail.docx"
+
+      # Act
+      validate_result = Ootempl.validate(template_path, data)
+      render_result = Ootempl.render(template_path, data, output_path)
+
+      # Assert
+      assert {:error, %Ootempl.PlaceholderError{}} = validate_result
+      assert {:error, %Ootempl.PlaceholderError{}} = render_result
+      refute File.exists?(output_path)
+    end
+
+    test "batch validate then batch render with pre-loaded template" do
+      # Arrange
+      {:ok, template} = Ootempl.load(@test_fixture)
+
+      customers = [
+        %{"person" => %{"first_name" => "Alice"}, "date" => "2025-01-01"},
+        %{"person" => %{"first_name" => "Bob"}, "date" => "2025-02-02"},
+        %{}
+      ]
+
+      # Act - filter valid customers
+      valid_customers =
+        Enum.filter(customers, fn customer ->
+          match?(:ok, Ootempl.validate(template, customer))
+        end)
+
+      # Assert - only first two customers are valid
+      assert length(valid_customers) == 2
+
+      # Act - render only valid customers
+      outputs =
+        valid_customers
+        |> Enum.with_index()
+        |> Enum.map(fn {customer, i} ->
+          output = "test/fixtures/batch_validate_#{i}.docx"
+          Ootempl.render(template, customer, output)
+          output
+        end)
+
+      # Assert - all renders succeeded
+      assert Enum.all?(outputs, &File.exists?/1)
+
+      # Cleanup
+      Enum.each(outputs, &File.rm!/1)
+    end
+  end
 end

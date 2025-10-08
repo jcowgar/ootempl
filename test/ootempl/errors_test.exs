@@ -1,12 +1,12 @@
 defmodule Ootempl.ErrorsTest do
   use ExUnit.Case, async: true
 
+  alias Ootempl.ImageError
   alias Ootempl.InvalidArchiveError
   alias Ootempl.MalformedXMLError
   alias Ootempl.MissingFileError
-  alias Ootempl.ValidationError
   alias Ootempl.PlaceholderError
-  alias Ootempl.ImageError
+  alias Ootempl.ValidationError
 
   describe "InvalidArchiveError" do
     # Arrange, Act, Assert

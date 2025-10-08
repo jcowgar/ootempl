@@ -454,6 +454,96 @@ defmodule Ootempl do
   end
 
   @doc """
+  Validates that a template can be successfully rendered with provided data.
+
+  This function runs the complete rendering pipeline (conditionals, tables, placeholders,
+  images) without creating output files. It returns `:ok` if rendering would succeed,
+  or the same errors that `render/3` would return.
+
+  This is useful for:
+  - **Pre-flight validation** - Check if data satisfies all placeholders before batch operations
+  - **Testing** - Verify template/data combinations without filesystem I/O
+  - **API endpoints** - Validate user input before expensive operations
+  - **Debugging** - Quickly test if data structure matches template requirements
+
+  ## Parameters
+
+  - `template` - Either:
+    - A file path (String) to a .docx template
+    - A `%Template{}` struct from `Ootempl.load/1` (faster)
+  - `data` - Map or struct of data for placeholder replacement
+
+  ## Returns
+
+  - `:ok` if rendering would succeed
+  - `{:error, %PlaceholderError{}}` when placeholders cannot be resolved
+  - `{:error, %ImageError{}}` when image processing fails
+  - `{:error, exception}` on structural failures
+
+  ## Examples
+
+      # Validate before rendering
+      data = %{"name" => "John", "total" => 99.99}
+
+      case Ootempl.validate("invoice.docx", data) do
+        :ok ->
+          # Safe to render
+          Ootempl.render("invoice.docx", data, "output.docx")
+
+        {:error, %Ootempl.PlaceholderError{} = error} ->
+          IO.puts("Missing placeholders: \#{inspect(error.placeholders)}")
+
+        {:error, reason} ->
+          IO.puts("Validation failed: \#{inspect(reason)}")
+      end
+
+      # Batch validation
+      templates = ["contract.docx", "invoice.docx", "receipt.docx"]
+      Enum.filter(templates, fn template ->
+        match?(:ok, Ootempl.validate(template, data))
+      end)
+
+      # With pre-loaded template (faster for batch validation)
+      {:ok, template} = Ootempl.load("invoice.docx")
+
+      customers
+      |> Enum.filter(fn customer ->
+        data = %{"name" => customer.name, "total" => customer.balance}
+        match?(:ok, Ootempl.validate(template, data))
+      end)
+      |> Enum.each(fn customer ->
+        data = %{"name" => customer.name, "total" => customer.balance}
+        Ootempl.render(template, data, "invoice_\#{customer.id}.docx")
+      end)
+  """
+  @spec validate(Path.t() | Template.t(), map() | struct()) :: :ok | {:error, term()}
+  def validate(template, data)
+
+  # Pattern 1: Validate with pre-loaded Template struct
+  def validate(%Template{} = template, data) do
+    validate_from_template(template, data)
+  end
+
+  # Pattern 2: Validate from file path
+  def validate(template_path, data) when is_binary(template_path) do
+    with :ok <- Validator.validate_docx(template_path),
+         {:ok, temp_dir} <- Archive.extract(template_path) do
+      # Process template without creating output file
+      result = validate_template_in_temp_dir(temp_dir, data)
+      cleanup_result = Archive.cleanup(temp_dir)
+
+      # Return original result or cleanup error
+      case {result, cleanup_result} do
+        {:ok, :ok} -> :ok
+        {:ok, {:error, _} = cleanup_error} -> cleanup_error
+        {error, _} -> error
+      end
+    else
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc """
   Renders a .docx template with data to generate an output document.
 
   This function accepts either a template file path (String) or a pre-loaded
@@ -572,6 +662,46 @@ defmodule Ootempl do
 
   # Private functions
 
+  # Validates template in temp directory without creating output file
+  @spec validate_template_in_temp_dir(Path.t(), map()) :: :ok | {:error, term()}
+  defp validate_template_in_temp_dir(temp_dir, data) do
+    with :ok <- process_single_xml_file(temp_dir, "word/document.xml", data),
+         :ok <- process_header_footer_files(temp_dir, data),
+         :ok <- process_footnote_endnote_files(temp_dir, data) do
+      process_document_properties(temp_dir, data)
+      # Validation successful - all processing steps completed without errors
+    end
+  end
+
+  # Validates from a pre-loaded template without creating output file
+  @spec validate_from_template(Template.t(), map()) :: :ok | {:error, term()}
+  defp validate_from_template(template, data) do
+    # Clone the template's XML structures (they'll be modified during processing)
+    document = Template.clone_xml(template.document)
+    headers = Template.clone_xml_map(template.headers)
+    footers = Template.clone_xml_map(template.footers)
+    footnotes = if template.footnotes, do: Template.clone_xml(template.footnotes)
+    endnotes = if template.endnotes, do: Template.clone_xml(template.endnotes)
+
+    core_props =
+      if template.core_properties, do: Template.clone_xml(template.core_properties)
+
+    app_props =
+      if template.app_properties, do: Template.clone_xml(template.app_properties)
+
+    # Process the cloned XML structures (same as render but skip file creation)
+    with {:ok, _processed_doc} <- process_xml_document(document, data),
+         {:ok, _processed_headers} <- process_xml_map(headers, data),
+         {:ok, _processed_footers} <- process_xml_map(footers, data),
+         {:ok, _processed_footnotes} <- process_optional_xml(footnotes, data),
+         {:ok, _processed_endnotes} <- process_optional_xml(endnotes, data),
+         {:ok, _processed_core} <- process_optional_xml_properties(core_props, data),
+         {:ok, _processed_app} <- process_optional_xml_properties(app_props, data) do
+      # Validation successful - all processing steps completed without errors
+      :ok
+    end
+  end
+
   @spec process_template(Path.t(), map(), Path.t()) :: :ok | {:error, term()}
   defp process_template(temp_dir, data, output_path) do
     with :ok <- process_single_xml_file(temp_dir, "word/document.xml", data),
@@ -609,8 +739,9 @@ defmodule Ootempl do
          :ok <- File.write(file_path, modified_xml) do
       :ok
     else
-      # PlaceholderError should be returned directly without wrapping
+      # PlaceholderError and ImageError should be returned directly without wrapping
       {:error, %Ootempl.PlaceholderError{} = error} -> {:error, error}
+      {:error, %Ootempl.ImageError{} = error} -> {:error, error}
       # Other errors are wrapped with context
       {:error, reason} -> {:error, {:file_processing_failed, relative_path, reason}}
     end
@@ -869,10 +1000,7 @@ defmodule Ootempl do
     end
   end
 
-  defp remove_conditional_markers_and_else_section(
-         xml_doc,
-         %{if: if_marker, else: _else_marker, endif: _endif_marker}
-       ) do
+  defp remove_conditional_markers_and_else_section(xml_doc, %{if: if_marker, else: _else_marker, endif: _endif_marker}) do
     # Has else section: remove if marker, remove entire else section through endif
     if_marker_text = "@if:#{if_marker.condition}@"
     else_marker_text = "@else@"
@@ -979,6 +1107,7 @@ defmodule Ootempl do
   @spec collect_paragraph_from_node(Xml.xml_node()) :: [Xml.xml_element()]
   defp collect_paragraph_from_node(node) do
     import Xml
+
     require Record
 
     cond do
@@ -1242,14 +1371,14 @@ defmodule Ootempl do
     document = Template.clone_xml(template.document)
     headers = Template.clone_xml_map(template.headers)
     footers = Template.clone_xml_map(template.footers)
-    footnotes = if template.footnotes, do: Template.clone_xml(template.footnotes), else: nil
-    endnotes = if template.endnotes, do: Template.clone_xml(template.endnotes), else: nil
+    footnotes = if template.footnotes, do: Template.clone_xml(template.footnotes)
+    endnotes = if template.endnotes, do: Template.clone_xml(template.endnotes)
 
     core_props =
-      if template.core_properties, do: Template.clone_xml(template.core_properties), else: nil
+      if template.core_properties, do: Template.clone_xml(template.core_properties)
 
     app_props =
-      if template.app_properties, do: Template.clone_xml(template.app_properties), else: nil
+      if template.app_properties, do: Template.clone_xml(template.app_properties)
 
     # Process the cloned XML structures
     with {:ok, processed_doc} <- process_xml_document(document, data),
@@ -1376,9 +1505,8 @@ defmodule Ootempl do
   defp process_xml_document(xml_doc, data) do
     with {:ok, conditional_processed} <- process_conditionals(xml_doc, data),
          {:ok, table_processed} <- process_tables(conditional_processed, data),
-         {:ok, replaced} <- Replacement.replace_in_document(table_processed, data),
-         {:ok, image_processed} <- process_images_in_memory(replaced, data) do
-      {:ok, image_processed}
+         {:ok, replaced} <- Replacement.replace_in_document(table_processed, data) do
+      process_images_in_memory(replaced, data)
     end
   end
 
@@ -1412,14 +1540,65 @@ defmodule Ootempl do
     Replacement.replace_in_document(xml, data)
   end
 
-  # Processes images in memory (without temp_dir)
+  # Validates images in memory (without temp_dir)
+  # For validation, we don't need to actually replace images, just verify they exist and are valid
   @spec process_images_in_memory(Xml.xml_element(), map()) ::
           {:ok, Xml.xml_element()} | {:error, term()}
-  defp process_images_in_memory(xml_doc, _data) do
-    # For now, just return the document unchanged
-    # Image processing would need temp_dir for relationships/content types
-    # This can be enhanced later if needed for batch operations
-    {:ok, xml_doc}
+  defp process_images_in_memory(xml_doc, data) do
+    # Find all placeholder images in the document
+    placeholders = Image.find_placeholder_images(xml_doc)
+
+    # If no placeholders, return document unchanged
+    if Enum.empty?(placeholders) do
+      {:ok, xml_doc}
+    else
+      # Validate each placeholder without modifying the document
+      case validate_all_image_placeholders(placeholders, data) do
+        :ok -> {:ok, xml_doc}
+        {:error, _} = error -> error
+      end
+    end
+  end
+
+  # Validates all image placeholders without modifying anything
+  @spec validate_all_image_placeholders([map()], map()) :: :ok | {:error, term()}
+  defp validate_all_image_placeholders([], _data), do: :ok
+
+  defp validate_all_image_placeholders([placeholder | rest], data) do
+    case validate_single_image_placeholder(placeholder, data) do
+      :ok -> validate_all_image_placeholders(rest, data)
+      {:error, _} = error -> error
+    end
+  end
+
+  # Validates a single image placeholder
+  @spec validate_single_image_placeholder(map(), map()) :: :ok | {:error, term()}
+  defp validate_single_image_placeholder(placeholder, data) do
+    # Get image path from data
+    image_path = Map.get(data, placeholder.placeholder_name)
+
+    if is_nil(image_path) do
+      {:error,
+       Ootempl.ImageError.exception(
+         placeholder_name: placeholder.placeholder_name,
+         image_path: nil,
+         reason: :image_not_found_in_data
+       )}
+    else
+      # Validate the image file exists and is supported
+      case Image.validate_image_file(image_path) do
+        :ok ->
+          :ok
+
+        {:error, reason} ->
+          {:error,
+           Ootempl.ImageError.exception(
+             placeholder_name: placeholder.placeholder_name,
+             image_path: image_path,
+             reason: reason
+           )}
+      end
+    end
   end
 
   # Builds output file map from processed XML and static files
@@ -1433,16 +1612,7 @@ defmodule Ootempl do
           Xml.xml_element() | nil,
           Xml.xml_element() | nil
         ) :: {:ok, Archive.file_map()} | {:error, term()}
-  defp build_output_file_map(
-         static_files,
-         document,
-         headers,
-         footers,
-         footnotes,
-         endnotes,
-         core_props,
-         app_props
-       ) do
+  defp build_output_file_map(static_files, document, headers, footers, footnotes, endnotes, core_props, app_props) do
     # Serialize all XML back to strings
     with {:ok, document_xml} <- Xml.serialize(document),
          {:ok, headers_map} <- serialize_xml_map(headers),
@@ -1495,8 +1665,7 @@ defmodule Ootempl do
     if File.dir?(Path.dirname(output_path)) do
       :ok
     else
-      {:error,
-       {:invalid_output_path, "Output directory does not exist: #{Path.dirname(output_path)}"}}
+      {:error, {:invalid_output_path, "Output directory does not exist: #{Path.dirname(output_path)}"}}
     end
   end
 

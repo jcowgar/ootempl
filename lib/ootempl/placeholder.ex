@@ -82,5 +82,4 @@ defmodule Ootempl.Placeholder do
   defp parse_path(variable) when is_binary(variable) do
     String.split(variable, ".")
   end
-
 end

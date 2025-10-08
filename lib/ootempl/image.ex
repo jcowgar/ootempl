@@ -201,9 +201,7 @@ defmodule Ootempl.Image do
       {100.0, 100.0}
   """
   @spec calculate_scaled_dimensions({number(), number()}, {number(), number()}) :: {float(), float()}
-  def calculate_scaled_dimensions({src_width, src_height}, {template_width, template_height})
-      when is_number(src_width) and is_number(src_height) and is_number(template_width) and
-             is_number(template_height) do
+  def calculate_scaled_dimensions({src_width, src_height}, {template_width, template_height}) do
     width_scale = template_width / src_width
     height_scale = template_height / src_height
     scale = min(width_scale, height_scale)

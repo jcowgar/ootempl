@@ -183,21 +183,21 @@ defmodule Ootempl.ImageTest do
       # Create JPEG with 0xFF00 marker (escaped FF byte) before SOF
       jpeg_with_escape_path = "test/fixtures/jpeg_with_escape.jpg"
       # JPEG signature + escaped FF + SOF0 marker with dimensions
+      # Escaped FF byte
+      # SOF0 marker (0xFFC0)
+      # Length (17 bytes)
+      # Precision
+      # Height
+      # Width
+      # Components
       jpeg_data =
         <<0xFF, 0xD8>> <>
-          # Escaped FF byte
           <<0xFF, 0x00>> <>
-          # SOF0 marker (0xFFC0)
           <<0xFF, 0xC0>> <>
-          # Length (17 bytes)
           <<0, 17>> <>
-          # Precision
           <<8>> <>
-          # Height
           <<0, 100>> <>
-          # Width
           <<0, 150>> <>
-          # Components
           <<3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1>>
 
       File.write!(jpeg_with_escape_path, jpeg_data)

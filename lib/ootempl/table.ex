@@ -279,7 +279,6 @@ defmodule Ootempl.Table do
     clone_element(row_element)
   end
 
-
   @doc """
   Inserts duplicated rows into a table at the specified position.
 
@@ -371,7 +370,7 @@ defmodule Ootempl.Table do
   defp find_tables_recursive(element, acc) do
     # Check if this element is a table
     acc =
-      if xmlElement(element, :name) |> Atom.to_string() == "w:tbl" do
+      if element |> xmlElement(:name) |> Atom.to_string() == "w:tbl" do
         [element | acc]
       else
         acc

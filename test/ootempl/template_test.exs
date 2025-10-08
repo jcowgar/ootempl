@@ -1,10 +1,10 @@
 defmodule Ootempl.TemplateTest do
   use ExUnit.Case, async: true
 
+  import Ootempl.Xml
+
   alias Ootempl.Template
   alias Ootempl.Xml
-
-  import Xml
 
   require Record
 
@@ -302,9 +302,41 @@ defmodule Ootempl.TemplateTest do
 
     test "clones map with multiple elements" do
       # Arrange
-      header1 = xmlElement(name: :"w:hdr", content: [], attributes: [], expanded_name: :"w:hdr", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
-      header2 = xmlElement(name: :"w:hdr", content: [], attributes: [], expanded_name: :"w:hdr", namespace: {:xmlNamespace, [], []}, parents: [], pos: 2, language: [])
-      footer1 = xmlElement(name: :"w:ftr", content: [], attributes: [], expanded_name: :"w:ftr", namespace: {:xmlNamespace, [], []}, parents: [], pos: 3, language: [])
+      header1 =
+        xmlElement(
+          name: :"w:hdr",
+          content: [],
+          attributes: [],
+          expanded_name: :"w:hdr",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
+      header2 =
+        xmlElement(
+          name: :"w:hdr",
+          content: [],
+          attributes: [],
+          expanded_name: :"w:hdr",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 2,
+          language: []
+        )
+
+      footer1 =
+        xmlElement(
+          name: :"w:ftr",
+          content: [],
+          attributes: [],
+          expanded_name: :"w:ftr",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 3,
+          language: []
+        )
 
       xml_map = %{
         "header1.xml" => header1,
@@ -329,7 +361,18 @@ defmodule Ootempl.TemplateTest do
 
     test "preserves map keys during cloning" do
       # Arrange
-      element = xmlElement(name: :"w:hdr", content: [], attributes: [], expanded_name: :"w:hdr", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+      element =
+        xmlElement(
+          name: :"w:hdr",
+          content: [],
+          attributes: [],
+          expanded_name: :"w:hdr",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
       xml_map = %{"word/header1.xml" => element}
 
       # Act
@@ -342,10 +385,54 @@ defmodule Ootempl.TemplateTest do
     test "clones complex nested XML in map values" do
       # Arrange
       text = xmlText(value: ~c"Header Text", parents: [], pos: 1, language: [], type: :text)
-      text_element = xmlElement(name: :"w:t", content: [text], attributes: [], expanded_name: :"w:t", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
-      run_element = xmlElement(name: :"w:r", content: [text_element], attributes: [], expanded_name: :"w:r", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
-      para_element = xmlElement(name: :"w:p", content: [run_element], attributes: [], expanded_name: :"w:p", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
-      header_element = xmlElement(name: :"w:hdr", content: [para_element], attributes: [], expanded_name: :"w:hdr", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+
+      text_element =
+        xmlElement(
+          name: :"w:t",
+          content: [text],
+          attributes: [],
+          expanded_name: :"w:t",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
+      run_element =
+        xmlElement(
+          name: :"w:r",
+          content: [text_element],
+          attributes: [],
+          expanded_name: :"w:r",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
+      para_element =
+        xmlElement(
+          name: :"w:p",
+          content: [run_element],
+          attributes: [],
+          expanded_name: :"w:p",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
+      header_element =
+        xmlElement(
+          name: :"w:hdr",
+          content: [para_element],
+          attributes: [],
+          expanded_name: :"w:hdr",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       xml_map = %{"header1.xml" => header_element}
 
@@ -370,8 +457,30 @@ defmodule Ootempl.TemplateTest do
     test "handles cloning XML map with different value types" do
       # Arrange
       text_node = xmlText(value: ~c"text", parents: [], pos: 1, language: [], type: :text)
-      element1 = xmlElement(name: :"w:hdr", content: [text_node], attributes: [], expanded_name: :"w:hdr", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
-      element2 = xmlElement(name: :"w:ftr", content: [], attributes: [], expanded_name: :"w:ftr", namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+
+      element1 =
+        xmlElement(
+          name: :"w:hdr",
+          content: [text_node],
+          attributes: [],
+          expanded_name: :"w:hdr",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
+      element2 =
+        xmlElement(
+          name: :"w:ftr",
+          content: [],
+          attributes: [],
+          expanded_name: :"w:ftr",
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       xml_map = %{
         "header1.xml" => element1,
@@ -407,7 +516,17 @@ defmodule Ootempl.TemplateTest do
         xmlAttribute(name: :class, value: ~c"heading")
       ]
 
-      element = xmlElement(name: :p, attributes: attrs, content: [], expanded_name: :p, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+      element =
+        xmlElement(
+          name: :p,
+          attributes: attrs,
+          content: [],
+          expanded_name: :p,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       # Act
       cloned = Template.clone_xml(element)
@@ -420,10 +539,32 @@ defmodule Ootempl.TemplateTest do
     test "handles cloning elements with mixed content" do
       # Arrange
       text1 = xmlText(value: ~c"Start ", parents: [], pos: 1, language: [], type: :text)
-      child_elem = xmlElement(name: :b, content: [xmlText(value: ~c"bold", parents: [], pos: 1, language: [], type: :text)], attributes: [], expanded_name: :b, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+
+      child_elem =
+        xmlElement(
+          name: :b,
+          content: [xmlText(value: ~c"bold", parents: [], pos: 1, language: [], type: :text)],
+          attributes: [],
+          expanded_name: :b,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
       text2 = xmlText(value: ~c" end", parents: [], pos: 2, language: [], type: :text)
 
-      element = xmlElement(name: :p, content: [text1, child_elem, text2], attributes: [], expanded_name: :p, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+      element =
+        xmlElement(
+          name: :p,
+          content: [text1, child_elem, text2],
+          attributes: [],
+          expanded_name: :p,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       # Act
       cloned = Template.clone_xml(element)
@@ -436,7 +577,18 @@ defmodule Ootempl.TemplateTest do
     test "handles cloning with namespace information" do
       # Arrange
       namespace = {:xmlNamespace, [{"w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}], []}
-      element = xmlElement(name: :"w:p", attributes: [], content: [], expanded_name: {:"http://schemas.openxmlformats.org/wordprocessingml/2006/main", :p}, namespace: namespace, parents: [], pos: 1, language: [])
+
+      element =
+        xmlElement(
+          name: :"w:p",
+          attributes: [],
+          content: [],
+          expanded_name: {:"http://schemas.openxmlformats.org/wordprocessingml/2006/main", :p},
+          namespace: namespace,
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       # Act
       cloned = Template.clone_xml(element)

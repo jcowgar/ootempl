@@ -1,9 +1,9 @@
 defmodule Ootempl.XmlTest do
   use ExUnit.Case, async: true
 
-  alias Ootempl.Xml
+  import Ootempl.Xml
 
-  import Xml
+  alias Ootempl.Xml
 
   require Record
 
@@ -333,9 +333,42 @@ defmodule Ootempl.XmlTest do
     test "handles serialization of complex nested structures" do
       # Arrange
       inner_text = xmlText(value: ~c"Deep text", parents: [], pos: 1, language: [], type: :text)
-      inner_elem = xmlElement(name: :inner, content: [inner_text], attributes: [], expanded_name: :inner, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
-      middle_elem = xmlElement(name: :middle, content: [inner_elem], attributes: [], expanded_name: :middle, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
-      outer_elem = xmlElement(name: :outer, content: [middle_elem], attributes: [], expanded_name: :outer, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+
+      inner_elem =
+        xmlElement(
+          name: :inner,
+          content: [inner_text],
+          attributes: [],
+          expanded_name: :inner,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
+      middle_elem =
+        xmlElement(
+          name: :middle,
+          content: [inner_elem],
+          attributes: [],
+          expanded_name: :middle,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
+
+      outer_elem =
+        xmlElement(
+          name: :outer,
+          content: [middle_elem],
+          attributes: [],
+          expanded_name: :outer,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       # Act
       {:ok, xml_string} = Xml.serialize(outer_elem)
@@ -351,7 +384,18 @@ defmodule Ootempl.XmlTest do
     test "handles serialization with special characters" do
       # Arrange
       text_with_special = xmlText(value: ~c"<>&\"'", parents: [], pos: 1, language: [], type: :text)
-      element = xmlElement(name: :test, content: [text_with_special], attributes: [], expanded_name: :test, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+
+      element =
+        xmlElement(
+          name: :test,
+          content: [text_with_special],
+          attributes: [],
+          expanded_name: :test,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       # Act
       {:ok, xml_string} = Xml.serialize(element)
@@ -365,7 +409,18 @@ defmodule Ootempl.XmlTest do
     test "handles serialization with Unicode characters" do
       # Arrange
       unicode_text = xmlText(value: String.to_charlist("Hello 世界 🌍"), parents: [], pos: 1, language: [], type: :text)
-      element = xmlElement(name: :unicode, content: [unicode_text], attributes: [], expanded_name: :unicode, namespace: {:xmlNamespace, [], []}, parents: [], pos: 1, language: [])
+
+      element =
+        xmlElement(
+          name: :unicode,
+          content: [unicode_text],
+          attributes: [],
+          expanded_name: :unicode,
+          namespace: {:xmlNamespace, [], []},
+          parents: [],
+          pos: 1,
+          language: []
+        )
 
       # Act
       {:ok, xml_string} = Xml.serialize(element)

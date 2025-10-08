@@ -1,10 +1,10 @@
 defmodule Ootempl.RelationshipsTest do
   use ExUnit.Case, async: true
 
+  import Ootempl.Xml
+
   alias Ootempl.Relationships
   alias Ootempl.Xml
-
-  import Xml
 
   require Record
 
@@ -66,6 +66,7 @@ defmodule Ootempl.RelationshipsTest do
 
       # Assert
       content = xmlElement(element, :content)
+
       relationship_elements =
         Enum.filter(content, fn node ->
           Record.is_record(node, :xmlElement) && xmlElement(node, :name) == :Relationship
