@@ -9,9 +9,9 @@ defmodule Ootempl do
   ## Features
 
   - Load and parse .docx templates
-  - Replace `@variable@` placeholders with dynamic content
-  - Support nested data access with dot notation (`@customer.name@`)
-  - Conditional sections with `@if:condition@...@endif@` syntax
+  - Replace `{{variable}}` placeholders with dynamic content
+  - Support nested data access with dot notation (`{{customer.name}}`)
+  - Conditional sections with `{{if condition}}...{{endif}}` syntax
   - Dynamic table row generation from list data
   - Multi-row table templates for complex layouts
   - Replace placeholder images with dynamic content (PNG, JPEG, GIF)
@@ -70,9 +70,9 @@ defmodule Ootempl do
   }
 
   # Template can reference struct fields:
-  # - @customer.name@ → "John Doe"
-  # - @customer.email@ → "john@example.com"
-  # - @customer.address.city@ → "Boston"
+  # - {{customer.name}} → "John Doe"
+  # - {{customer.email}} → "john@example.com"
+  # - {{customer.address.city}} → "Boston"
 
   Ootempl.render("invoice_template.docx", data, "invoice.docx")
   #=> :ok
@@ -80,7 +80,7 @@ defmodule Ootempl do
 
   Struct features:
   - **Nested structs**: Access fields multiple levels deep
-  - **Case-insensitive**: `@customer.Name@` matches `:name` field
+  - **Case-insensitive**: `{{customer.Name}}` matches `:name` field
   - **Mixed data**: Combine structs and maps in the same data structure
   - **Lists of structs**: Use structs in table templates
 
@@ -105,9 +105,9 @@ defmodule Ootempl do
 
   Template structure in Word document:
   ```
-  | Claim ID       | Amount           |  ← Header (no list placeholders)
-  | @claims.id@    | @claims.amount@  |  ← Template row (references "claims" list)
-  | Total          | @total@          |  ← Footer (single value)
+  | Claim ID          | Amount              |  ← Header (no list placeholders)
+  | {{claims.id}}     | {{claims.amount}}   |  ← Template row (references "claims" list)
+  | Total             | {{total}}           |  ← Footer (single value)
   ```
 
   Generated output:
@@ -130,8 +130,8 @@ defmodule Ootempl do
 
   Template with two rows per order:
   ```
-  | Order @orders.id@              |  ← Row 1 of template
-  | @orders.qty@x @orders.product@ @ $@orders.price@ each |  ← Row 2 of template
+  | Order {{orders.id}}                                  |  ← Row 1 of template
+  | {{orders.qty}}x {{orders.product}} @ ${{orders.price}} each |  ← Row 2 of template
   ```
 
   Generated output duplicates both rows for each order:
@@ -145,21 +145,21 @@ defmodule Ootempl do
   ### Conditional Sections
 
   Control which sections of your document appear based on data conditions using
-  `@if:condition@...@endif@` markers. Sections are shown when the condition is
+  `{{if condition}}...{{endif}}` markers. Sections are shown when the condition is
   truthy and hidden when falsy.
 
   ```elixir
   # Template structure:
   # Standard content here.
   #
-  # @if:show_disclaimer@
+  # {{if show_disclaimer}}
   # DISCLAIMER: This is a legal disclaimer that appears
   # only when show_disclaimer is true.
-  # @endif@
+  # {{endif}}
   #
-  # @if:include_pricing@
+  # {{if include_pricing}}
   # Pricing: $100/month
-  # @endif@
+  # {{endif}}
 
   data = %{
     "show_disclaimer" => true,
@@ -172,17 +172,17 @@ defmodule Ootempl do
 
   **If/Else Support:**
 
-  Use `@else@` markers to show alternative content when a condition is false:
+  Use `{{else}}` markers to show alternative content when a condition is false:
 
   ```elixir
   # Template structure:
   # Dear Customer,
   #
-  # @if:is_premium@
+  # {{if is_premium}}
   # Thank you for being a premium member! You get 20% off.
-  # @else@
+  # {{else}}
   # Become a premium member today for 20% off all purchases.
-  # @endif@
+  # {{endif}}
   #
   # Thank you!
 
@@ -200,9 +200,9 @@ defmodule Ootempl do
   - **Falsy**: `nil`, `false`, `""` (empty string), `0`, `0.0`
 
   **Conditional features:**
-  - Case-insensitive markers: `@IF:name@`, `@if:NAME@`, `@ELSE@` all work
-  - Nested data paths: `@if:customer.active@`
-  - Optional `@else@` for alternative content
+  - Case-insensitive markers: `{{IF name}}`, `{{if NAME}}`, `{{ELSE}}` all work
+  - Nested data paths: `{{if customer.active}}`
+  - Optional `{{else}}` for alternative content
   - Multi-paragraph sections supported
   - Sections can contain tables, images, lists, etc.
 
@@ -213,9 +213,9 @@ defmodule Ootempl do
 
   ```elixir
   # Template has placeholders in File > Properties:
-  # - Title: @document_title@
-  # - Author: @author@
-  # - Company: @company_name@
+  # - Title: {{document_title}}
+  # - Author: {{author}}
+  # - Company: {{company_name}}
 
   data = %{
     "document_title" => "Q4 Financial Report",
@@ -238,9 +238,9 @@ defmodule Ootempl do
 
   ```elixir
   # Template has:
-  # - Header with: @company_name@ - @document_title@
-  # - Footer with: Page @page@ of @total_pages@
-  # - Footnote with: @footnote_citation@
+  # - Header with: {{company_name}} - {{document_title}}
+  # - Footer with: Page {{page}} of {{total_pages}}
+  # - Footnote with: {{footnote_citation}}
 
   data = %{
     "company_name" => "Acme Corp",
@@ -253,13 +253,13 @@ defmodule Ootempl do
   ### Image Replacement
 
   Replace placeholder images in templates with dynamic images from your data. Use the
-  alt text field in Word to mark placeholder images with `@image:name@` markers.
+  alt text field in Word to mark placeholder images with `{{image:name}}` markers.
 
   **Preparing templates in Word:**
 
   1. Insert a placeholder image (any PNG, JPEG, or GIF)
   2. Right-click the image → "View Alt Text" (or "Edit Alt Text")
-  3. Set the alt text to `@image:placeholder_name@` (e.g., `@image:company_logo@`)
+  3. Set the alt text to `{{image:placeholder_name}}` (e.g., `{{image:company_logo}}`)
   4. Save the template
 
   **Data structure:**
@@ -304,9 +304,9 @@ defmodule Ootempl do
 
   ```elixir
   # Template contains three images:
-  # - Header logo with alt text: @image:company_logo@
-  # - Employee photo with alt text: @image:employee_photo@
-  # - Footer signature with alt text: @image:signature@
+  # - Header logo with alt text: {{image:company_logo}}
+  # - Employee photo with alt text: {{image:employee_photo}}
+  # - Footer signature with alt text: {{image:signature}}
 
   data = %{
     "company_logo" => "assets/logo.png",
@@ -327,7 +327,7 @@ defmodule Ootempl do
   data = %{"name" => "John"}
   Ootempl.render("template.docx", data, "output.docx")
   #=> {:error, %Ootempl.ImageError{
-  #     message: "Image placeholder '@image:logo@' has no corresponding data key 'logo'",
+  #     message: "Image placeholder '{{image:logo}}' has no corresponding data key 'logo'",
   #     placeholder_name: "logo",
   #     image_path: nil,
   #     reason: :image_not_found_in_data
@@ -551,7 +551,7 @@ defmodule Ootempl do
   This function analyzes a template without performing any data replacement. It
   returns detailed information about:
   - All variable placeholders found in the template
-  - All conditional markers (`@if:@`, `@else@`, `@endif@`)
+  - All conditional markers (`{{if}}`, `{{else}}`, `{{endif}}`)
   - Required top-level data keys
   - Syntax validation errors (unclosed conditionals, malformed placeholders, etc.)
 
@@ -615,25 +615,25 @@ defmodule Ootempl do
         IO.puts("  Path: \#{Enum.join(ph.path, ".")}")
         IO.puts("  Found in: \#{inspect(ph.locations)}")
       end)
-      #=> Placeholder: @customer.name@
+      #=> Placeholder: {{customer.name}}
       #     Path: customer.name
       #     Found in: [:document_body, :header1]
 
       # List conditionals
       Enum.each(info.conditionals, fn cond ->
-        IO.puts("Conditional: @if:\#{cond.condition}@")
+        IO.puts("Conditional: {{if \#{cond.condition}}}")
         IO.puts("  Path: \#{Enum.join(cond.path, ".")}")
       end)
-      #=> Conditional: @if:show_disclaimer@
+      #=> Conditional: {{if show_disclaimer}}
       #     Path: show_disclaimer
 
   ## Detectable Errors
 
-  - **Unclosed conditionals** - `@if:condition@` without matching `@endif@`
-  - **Orphan markers** - `@endif@` or `@else@` without matching `@if:@`
+  - **Unclosed conditionals** - `{{if condition}}` without matching `{{endif}}`
+  - **Orphan markers** - `{{endif}}` or `{{else}}` without matching `{{if}}`
   - **Nested conditionals** - Conditional blocks inside other blocks (not supported)
   - **Malformed placeholders** - Invalid placeholder syntax
-  - **Invalid conditional syntax** - Empty conditions, missing trailing `@`
+  - **Invalid conditional syntax** - Empty conditions, missing closing `}}`
 
   ## Template Coverage
 
@@ -685,9 +685,9 @@ defmodule Ootempl do
   `%Template{}` struct. Using a pre-loaded template is significantly faster
   for batch operations.
 
-  Replaces `@variable@` placeholders in the template with values from the data map,
-  supporting nested data access with dot notation (e.g., `@customer.name@`).
-  Case-insensitive matching ensures `@Name@`, `@name@`, and `@NAME@` all match
+  Replaces `{{variable}}` placeholders in the template with values from the data map,
+  supporting nested data access with dot notation (e.g., `{{customer.name}}`).
+  Case-insensitive matching ensures `{{Name}}`, `{{name}}`, and `{{NAME}}` all match
   the same data key.
 
   ## Parameters
@@ -732,10 +732,10 @@ defmodule Ootempl do
       # Missing placeholders (collects all errors)
       Ootempl.render("template.docx", %{}, "output.docx")
       #=> {:error, %Ootempl.PlaceholderError{
-      #     message: "2 placeholders could not be resolved (first: @name@)",
+      #     message: "2 placeholders could not be resolved (first: {{name}})",
       #     placeholders: [
-      #       %{placeholder: "@name@", reason: {:path_not_found, ["name"]}},
-      #       %{placeholder: "@customer.email@", reason: {:path_not_found, ["customer", "email"]}}
+      #       %{placeholder: "{{name}}", reason: {:path_not_found, ["name"]}},
+      #       %{placeholder: "{{customer.email}}", reason: {:path_not_found, ["customer", "email"]}}
       #     ]
       #   }}
 
@@ -996,9 +996,9 @@ defmodule Ootempl do
         # Parse error message to determine error type
         error_type =
           cond do
-            String.contains?(message, "Unmatched @if") -> :unclosed_conditional
+            String.contains?(message, "Unmatched {{if") -> :unclosed_conditional
             String.contains?(message, "Orphan") -> :unclosed_conditional
-            String.contains?(message, "Multiple @else@") -> :invalid_conditional_syntax
+            String.contains?(message, "Multiple {{else}}") -> :invalid_conditional_syntax
             true -> :invalid_conditional_syntax
           end
 
@@ -1268,7 +1268,7 @@ defmodule Ootempl do
   # Processes a document property XML file using simple text replacement.
   #
   # Property files have simpler XML structures with direct text content
-  # (e.g., `<dc:title>@title@</dc:title>`) rather than the complex
+  # (e.g., `<dc:title>{{title}}</dc:title>`) rather than the complex
   # w:p/w:r/w:t structure used in the main document. This function uses
   # the full XML processing pipeline to ensure proper handling.
   @spec process_property_file(Path.t(), String.t(), map()) :: :ok | {:error, term()}
@@ -1290,7 +1290,7 @@ defmodule Ootempl do
 
   # Processes conditional sections in an XML document.
   #
-  # Detects all `@if:condition@...@endif@` markers, evaluates conditions,
+  # Detects all `{{if condition}}...{{endif}}` markers, evaluates conditions,
   # and either removes sections (when false) or removes markers (when true).
   #
   # This must run BEFORE variable replacement to ensure removed sections

@@ -25,7 +25,7 @@ defmodule Ootempl.DataAccess do
 
   ## Case-Insensitive Matching
 
-  The module matches keys case-insensitively, so `@Name@`, `@name@`, and `@NAME@`
+  The module matches keys case-insensitively, so `{{Name}}`, `{{name}}`, and `{{NAME}}`
   all match the same data key:
 
       iex> data = %{"name" => "John"}

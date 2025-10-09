@@ -157,7 +157,7 @@ defmodule Ootempl.PlaceholderError do
   than failing on the first missing placeholder.
 
   Each placeholder error contains:
-  - `placeholder` - The original placeholder text (e.g., "@name@")
+  - `placeholder` - The original placeholder text (e.g., "{{name}}")
   - `reason` - Why it couldn't be resolved (e.g., `{:path_not_found, ["name"]}`)
 
   ## Common Reasons
