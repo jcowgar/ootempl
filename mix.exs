@@ -35,8 +35,12 @@ defmodule Ootempl.MixProject do
 
   defp package do
     [
-      licenses: ["MIT"],
-      links: %{}
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
+      licenses: ["LGPL-3.0-only"],
+      links: %{
+        "GitHub" => "https://github.com/jcowgar/ootempl",
+        "Changelog" => "https://github.com/jcowgar/ootempl/blob/main/CHANGELOG.md"
+      }
     ]
   end
 
