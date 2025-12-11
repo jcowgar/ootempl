@@ -234,7 +234,10 @@ defmodule Ootempl.Image do
   """
   @spec parse_content_types(String.t()) :: {:ok, tuple()} | {:error, atom()}
   def parse_content_types(xml_string) when is_binary(xml_string) do
-    {xml_element, _} = :xmerl_scan.string(to_charlist(xml_string), quiet: true)
+    # Use :erlang.binary_to_list/1 to get raw UTF-8 bytes.
+    # xmerl expects raw bytes and handles UTF-8 decoding internally.
+    charlist = :erlang.binary_to_list(xml_string)
+    {xml_element, _} = :xmerl_scan.string(charlist, quiet: true)
     {:ok, xml_element}
   catch
     :exit, _ -> {:error, :invalid_xml}

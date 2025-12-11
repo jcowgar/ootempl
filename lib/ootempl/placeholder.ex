@@ -64,8 +64,12 @@ defmodule Ootempl.Placeholder do
     @placeholder_regex
     |> Regex.scan(text, return: :index)
     |> Enum.map(fn [{start, length}, {var_start, var_length}] ->
-      variable = String.slice(text, var_start, var_length)
-      original = String.slice(text, start, length)
+      # Use :binary.part/3 instead of String.slice/3 because Regex.scan
+      # returns byte positions, not grapheme positions. String.slice uses
+      # grapheme indices which causes misalignment when multi-byte UTF-8
+      # characters (like em-dash, ®, smart quotes) are present in the text.
+      variable = :binary.part(text, var_start, var_length)
+      original = :binary.part(text, start, length)
 
       %{
         original: original,

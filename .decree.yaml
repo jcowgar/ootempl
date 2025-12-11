@@ -80,11 +80,6 @@ documents:
       ## Task Breakdown
       Links to implementation issues.
     id_template: "{{sequence:4}}"
-    list_columns:
-      - id
-      - updated
-      - status
-      - title
     metadata:
       fields:
         status:
@@ -117,12 +112,6 @@ documents:
       ## Review Feedback
       *Updated after review phase*
     id_template: "{{sequence:4}}"
-    list_columns:
-      - id
-      - updated
-      - epic
-      - status
-      - title
     metadata:
       fields:
         epic:

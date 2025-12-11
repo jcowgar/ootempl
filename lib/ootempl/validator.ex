@@ -73,7 +73,9 @@ defmodule Ootempl.Validator do
 
   @spec validate_xml(String.t()) :: :ok | {:error, term()}
   defp validate_xml(xml_string) when is_binary(xml_string) do
-    charlist = String.to_charlist(xml_string)
+    # Use :erlang.binary_to_list/1 to get raw UTF-8 bytes.
+    # xmerl expects raw bytes and handles UTF-8 decoding internally.
+    charlist = :erlang.binary_to_list(xml_string)
 
     try do
       :xmerl_scan.string(charlist, namespace_conformant: true)

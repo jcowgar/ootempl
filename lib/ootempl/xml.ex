@@ -77,10 +77,10 @@ defmodule Ootempl.Xml do
   """
   @spec parse(String.t()) :: {:ok, xml_element()} | {:error, term()}
   def parse(xml_string) when is_binary(xml_string) do
-    # :xmerl_scan.string/2 expects a charlist
-    # Note: :xmerl has limited UTF-8 support; non-ASCII characters may need
-    # the XML declaration with encoding="UTF-8" to parse correctly
-    charlist = String.to_charlist(xml_string)
+    # Use :erlang.binary_to_list/1 to get raw UTF-8 bytes, not Unicode codepoints.
+    # xmerl expects raw bytes and handles UTF-8 decoding internally.
+    # String.to_charlist/1 gives codepoints which causes {:bad_character, N} errors.
+    charlist = :erlang.binary_to_list(xml_string)
     {doc, _rest} = :xmerl_scan.string(charlist, namespace_conformant: true)
     {:ok, doc}
   rescue
