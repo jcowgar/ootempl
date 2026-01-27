@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Hierarchical table support using block markers (`{{#list}}...{{/list}}`)
+- Support for nested parent-child data iteration in tables
+- Header/body/footer row sections within block markers
+- Data scoping: child rows inherit parent data fields
+- Automatic removal of marker-only rows from output
+- New `Ootempl.Block` module for block marker detection and expansion
+
 ## [0.1.0] - 2025-10-09
 
 ### Added

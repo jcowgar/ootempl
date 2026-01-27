@@ -142,6 +142,52 @@ defmodule Ootempl do
   | 3x Gadget @ $25.00 each |
   ```
 
+  ### Hierarchical Table Templates
+
+  For nested data structures with parent-child relationships, use block markers
+  (`{{#list}}...{{/list}}`) in dedicated rows to create multi-level layouts:
+
+  ```elixir
+  data = %{
+    "categories" => [
+      %{
+        "name" => "Electronics",
+        "total" => "$300",
+        "subtotal" => "$300",
+        "items" => [
+          %{"desc" => "Phone", "price" => "$200"},
+          %{"desc" => "Charger", "price" => "$100"}
+        ]
+      }
+    ]
+  }
+  ```
+
+  Template structure (marker rows are removed from output):
+  ```
+  | {{#categories}} |             |         |  ← Marker row (removed)
+  | {{name}}        | {{total}}   |         |  ← Header row
+  | {{#items}}      |             |         |  ← Marker row (removed)
+  |                 | {{desc}}    | {{price}}|  ← Body row (repeated per child)
+  | {{/items}}      |             |         |  ← Marker row (removed)
+  |                 | Subtotal:   | {{subtotal}} | ← Footer row
+  | {{/categories}} |             |         |  ← Marker row (removed)
+  ```
+
+  Generated output:
+  ```
+  | Electronics |       |       |
+  |             | Phone | $200  |
+  |             | Charger| $100 |
+  |             | Subtotal: | $300 |
+  ```
+
+  Block marker features:
+  - **Dedicated rows**: Block markers must be in their own rows (removed from output)
+  - **Nested blocks**: Support for parent/child iteration with separate data scoping
+  - **Data inheritance**: Child rows access both parent and child data fields
+  - **Empty handling**: Empty parent list produces no rows; empty children skips body rows
+
   ### Conditional Sections
 
   Control which sections of your document appear based on data conditions using
@@ -384,6 +430,7 @@ defmodule Ootempl do
   """
 
   alias Ootempl.Archive
+  alias Ootempl.Block
   alias Ootempl.Conditional
   alias Ootempl.Image
   alias Ootempl.Placeholder
@@ -1666,16 +1713,171 @@ defmodule Ootempl do
           {:ok, Xml.xml_element()} | {:error, term()}
   defp process_single_table(table, data, xml_doc) do
     rows = Table.extract_rows(table)
+    table_text = extract_table_text(table)
 
-    # Group template rows
-    case Table.group_template_rows(rows, data) do
-      {:ok, row_analyses} ->
-        # Find template row groups and duplicate
-        process_row_groups(table, row_analyses, data, xml_doc)
+    # Check if table contains block markers for hierarchical processing
+    if Block.contains_markers?(table_text) do
+      process_block_table(table, rows, data, xml_doc)
+    else
+      # Existing simple table processing
+      case Table.group_template_rows(rows, data) do
+        {:ok, row_analyses} ->
+          # Find template row groups and duplicate
+          process_row_groups(table, row_analyses, data, xml_doc)
 
-      {:error, {:multiple_lists, _row}} = error ->
-        error
+        {:error, {:multiple_lists, _row}} = error ->
+          error
+      end
     end
+  end
+
+  # Processes a table with hierarchical block markers
+  @spec process_block_table(Xml.xml_element(), [Xml.xml_element()], map(), Xml.xml_element()) ::
+          {:ok, Xml.xml_element()} | {:error, term()}
+  defp process_block_table(table, rows, data, xml_doc) do
+    with {:ok, structure} <- Block.parse_table_structure(rows, data),
+         expanded <- Block.expand_block(structure, rows, data),
+         {:ok, replaced_rows} <- replace_placeholders_in_expanded_rows(expanded),
+         block_row_range <- {structure.open_row_index, structure.close_row_index},
+         new_table <- rebuild_table_with_expanded_rows(table, rows, replaced_rows, block_row_range) do
+      replace_table_in_doc(xml_doc, table, new_table)
+    end
+  end
+
+  # Replaces placeholders in expanded rows
+  @spec replace_placeholders_in_expanded_rows([{Xml.xml_element(), map()}]) ::
+          {:ok, [Xml.xml_element()]} | {:error, term()}
+  defp replace_placeholders_in_expanded_rows(expanded_rows) do
+    {replaced_rows, all_errors} =
+      Enum.reduce(expanded_rows, {[], []}, fn {row, scoped_data}, {rows_acc, errors_acc} ->
+        # Strip block markers from the row before replacement
+        cleaned_row = strip_block_markers_from_row(row)
+
+        case Replacement.replace_in_document(cleaned_row, scoped_data) do
+          {:ok, replaced_row} ->
+            {[replaced_row | rows_acc], errors_acc}
+
+          {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} ->
+            {[cleaned_row | rows_acc], errors_acc ++ placeholders}
+        end
+      end)
+
+    if all_errors == [] do
+      {:ok, Enum.reverse(replaced_rows)}
+    else
+      {:error, Ootempl.PlaceholderError.exception(placeholders: all_errors)}
+    end
+  end
+
+  # Strips block markers from a row's text content
+  @spec strip_block_markers_from_row(Xml.xml_element()) :: Xml.xml_element()
+  defp strip_block_markers_from_row(row) do
+    import Xml
+
+    require Record
+
+    # Pattern to match block markers
+    marker_pattern = ~r/\{\{[#\/][a-zA-Z_][a-zA-Z0-9_]*\}\}/
+
+    # Recursively process the row to strip markers
+    strip_markers_recursive(row, marker_pattern)
+  end
+
+  @spec strip_markers_recursive(Xml.xml_node(), Regex.t()) :: Xml.xml_node()
+  defp strip_markers_recursive(node, pattern) do
+    import Xml
+
+    require Record
+
+    cond do
+      Record.is_record(node, :xmlText) ->
+        text = node |> xmlText(:value) |> List.to_string()
+        cleaned = String.replace(text, pattern, "")
+        xmlText(node, value: String.to_charlist(cleaned))
+
+      Record.is_record(node, :xmlElement) ->
+        content = xmlElement(node, :content)
+        cleaned_content = Enum.map(content, &strip_markers_recursive(&1, pattern))
+        xmlElement(node, content: cleaned_content)
+
+      true ->
+        node
+    end
+  end
+
+  # Rebuilds the table with expanded rows, removing only block rows
+  @spec rebuild_table_with_expanded_rows(
+          Xml.xml_element(),
+          [Xml.xml_element()],
+          [Xml.xml_element()],
+          {non_neg_integer(), non_neg_integer()}
+        ) :: Xml.xml_element()
+  defp rebuild_table_with_expanded_rows(table, original_rows, expanded_rows, {block_start, block_end}) do
+    import Xml
+
+    require Record
+
+    content = xmlElement(table, :content)
+
+    # Get rows before the block (static header rows)
+    rows_before_block = Enum.slice(original_rows, 0, block_start)
+
+    # Get rows after the block (static footer rows)
+    rows_after_block = Enum.slice(original_rows, (block_end + 1)..-1//1)
+
+    # Find the position in content where the first block row is
+    # We need to insert our new rows at this position
+    row_indices_in_content =
+      content
+      |> Enum.with_index()
+      |> Enum.filter(fn {node, _idx} ->
+        Record.is_record(node, :xmlElement) and xmlElement(node, :name) == :"w:tr"
+      end)
+      |> Enum.map(fn {_node, idx} -> idx end)
+
+    # Non-row content (tblPr, tblGrid, etc.)
+    non_row_content =
+      content
+      |> Enum.with_index()
+      |> Enum.filter(fn {node, _idx} ->
+        not (Record.is_record(node, :xmlElement) and xmlElement(node, :name) == :"w:tr")
+      end)
+      |> Enum.map(fn {node, _idx} -> node end)
+
+    # Get the position where the first row appears in content
+    first_row_content_idx = List.first(row_indices_in_content) || 0
+
+    # Split non-row content - items before any rows and items after
+    {before_non_row, after_non_row} =
+      non_row_content
+      |> Enum.with_index()
+      |> Enum.split_with(fn {_node, orig_idx} ->
+        # Find original index of this non-row item
+        actual_idx =
+          content
+          |> Enum.with_index()
+          |> Enum.filter(fn {node, _} ->
+            not (Record.is_record(node, :xmlElement) and xmlElement(node, :name) == :"w:tr")
+          end)
+          |> Enum.at(orig_idx)
+          |> elem(1)
+
+        actual_idx < first_row_content_idx
+      end)
+
+    before_non_row = Enum.map(before_non_row, &elem(&1, 0))
+    after_non_row = Enum.map(after_non_row, &elem(&1, 0))
+
+    # Combine: before non-rows + rows before block + expanded rows + rows after block + after non-rows
+    new_content = before_non_row ++ rows_before_block ++ expanded_rows ++ rows_after_block ++ after_non_row
+
+    xmlElement(table, content: new_content)
+  end
+
+  # Extracts all text content from a table for marker detection
+  @spec extract_table_text(Xml.xml_element()) :: String.t()
+  defp extract_table_text(table) do
+    extract_text_from_element(table)
   end
 
   @spec process_row_groups(Xml.xml_element(), [Table.row_analysis()], map(), Xml.xml_element()) ::

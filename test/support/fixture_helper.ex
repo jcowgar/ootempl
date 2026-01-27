@@ -321,4 +321,134 @@ defmodule Ootempl.FixtureHelper do
     </w:document>
     """
   end
+
+  @doc """
+  Creates a .docx file with a hierarchical table using block markers.
+
+  The table structure uses {{#list}} and {{/list}} block markers for
+  nested iteration with header/body/footer sections.
+
+  Returns the path to the created fixture file.
+  """
+  @spec create_hierarchical_table_docx(Path.t()) :: Path.t()
+  def create_hierarchical_table_docx(output_path) do
+    file_map = %{
+      "[Content_Types].xml" => content_types_xml(),
+      "_rels/.rels" => rels_xml(),
+      "word/document.xml" => hierarchical_table_document_xml(),
+      "word/_rels/document.xml.rels" => document_rels_xml()
+    }
+
+    case Ootempl.Archive.create(file_map, output_path) do
+      :ok -> output_path
+      {:error, reason} -> raise "Failed to create fixture: #{inspect(reason)}"
+    end
+  end
+
+  defp hierarchical_table_document_xml do
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body>
+        <w:p>
+          <w:r><w:t>Revenue Report for {{report_title}}</w:t></w:r>
+        </w:p>
+        <w:tbl>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{#revcode_data}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{revcode}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>{{description}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>{{total_amount}}</w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{#children}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>{{child_desc}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>{{cost}}</w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{/children}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>Subtotal:</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>{{subtotal}}</w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{/revcode_data}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+          </w:tr>
+        </w:tbl>
+        <w:p>
+          <w:r><w:t>End of Report</w:t></w:r>
+        </w:p>
+      </w:body>
+    </w:document>
+    """
+  end
+
+  @doc """
+  Creates a .docx file with a simple (single-level) block marker table.
+
+  Returns the path to the created fixture file.
+  """
+  @spec create_simple_block_table_docx(Path.t()) :: Path.t()
+  def create_simple_block_table_docx(output_path) do
+    file_map = %{
+      "[Content_Types].xml" => content_types_xml(),
+      "_rels/.rels" => rels_xml(),
+      "word/document.xml" => simple_block_table_document_xml(),
+      "word/_rels/document.xml.rels" => document_rels_xml()
+    }
+
+    case Ootempl.Archive.create(file_map, output_path) do
+      :ok -> output_path
+      {:error, reason} -> raise "Failed to create fixture: #{inspect(reason)}"
+    end
+  end
+
+  defp simple_block_table_document_xml do
+    """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body>
+        <w:p>
+          <w:r><w:t>Items List</w:t></w:r>
+        </w:p>
+        <w:tbl>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>Name</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>Price</w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{#items}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{name}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t>{{price}}</w:t></w:r></w:p></w:tc>
+          </w:tr>
+          <w:tr>
+            <w:tc><w:p><w:r><w:t>{{/items}}</w:t></w:r></w:p></w:tc>
+            <w:tc><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>
+          </w:tr>
+        </w:tbl>
+        <w:p>
+          <w:r><w:t>Total: {{total}}</w:t></w:r>
+        </w:p>
+      </w:body>
+    </w:document>
+    """
+  end
 end
