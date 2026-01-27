@@ -247,6 +247,37 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       assert length(error.placeholders) > 0
     end
 
+    test "returns error when repeating row item is missing a required field" do
+      # This test verifies that placeholder errors in repeating table rows are
+      # properly reported. Previously, such errors were silently swallowed and
+      # the affected rows would be dropped from the output without any warning.
+
+      # Arrange - people list exists but one item is missing the 'age' field
+      data = %{
+        "person" => %{"first_name" => "John"},
+        "client" => "Acme Corp",
+        "people" => [
+          %{"first_name" => "Alice", "last_name" => "Smith", "age" => "28"},
+          %{"first_name" => "Bob", "last_name" => "Jones"},
+          # Bob is missing "age" - this should cause an error
+          %{"first_name" => "Carol", "last_name" => "Davis", "age" => "42"}
+        ],
+        "average_age" => "35"
+      }
+
+      # Act
+      result = Ootempl.render(@template_path, data, @output_path)
+
+      # Assert - should return an error about the missing field in the repeating row
+      assert {:error, error} = result
+      assert %Ootempl.PlaceholderError{} = error
+      assert length(error.placeholders) > 0
+
+      # The error should mention the problematic placeholder
+      placeholder_names = Enum.map(error.placeholders, & &1.placeholder)
+      assert Enum.any?(placeholder_names, &(&1 =~ "age"))
+    end
+
     test "handles large dataset efficiently" do
       # Arrange - generate 50 people
       people =

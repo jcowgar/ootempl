@@ -1685,15 +1685,35 @@ defmodule Ootempl do
     template_groups = identify_template_groups(row_analyses)
 
     # Process template groups in reverse order to maintain positions
-    modified_table =
+    # Collect all errors from all groups before failing
+    result =
       template_groups
       |> Enum.reverse()
-      |> Enum.reduce(table, fn group, acc_table ->
-        duplicate_and_replace_group(group, data, acc_table)
+      |> Enum.reduce({:ok, table, []}, fn group, {status, acc_table, acc_errors} ->
+        case status do
+          :ok ->
+            case duplicate_and_replace_group(group, data, acc_table) do
+              {:ok, new_table} -> {:ok, new_table, acc_errors}
+              {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} -> {:error, acc_table, acc_errors ++ placeholders}
+            end
+
+          :error ->
+            # Continue processing to collect all errors
+            case duplicate_and_replace_group(group, data, acc_table) do
+              {:ok, new_table} -> {:error, new_table, acc_errors}
+              {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} -> {:error, acc_table, acc_errors ++ placeholders}
+            end
+        end
       end)
 
-    # Replace the old table with modified table in the document
-    replace_table_in_doc(xml_doc, table, modified_table)
+    case result do
+      {:ok, modified_table, []} ->
+        # Replace the old table with modified table in the document
+        replace_table_in_doc(xml_doc, table, modified_table)
+
+      {_, _table, errors} when errors != [] ->
+        {:error, Ootempl.PlaceholderError.exception(placeholders: errors)}
+    end
   end
 
   @spec identify_template_groups([Table.row_analysis()]) ::
@@ -1731,25 +1751,39 @@ defmodule Ootempl do
           %{rows: [Xml.xml_element()], list_key: String.t(), position: non_neg_integer()},
           map(),
           Xml.xml_element()
-        ) :: Xml.xml_element()
+        ) :: {:ok, Xml.xml_element()} | {:error, Ootempl.PlaceholderError.t()}
   defp duplicate_and_replace_group(group, data, table) do
     # Duplicate rows with scoped data
     duplicated_with_data = Table.duplicate_rows(group.rows, group.list_key, data)
 
-    # Replace placeholders in each duplicated row
-    duplicated_rows =
-      Enum.map(duplicated_with_data, fn {row, scoped_data} ->
-        # Apply replacement to this row with scoped data
+    # Replace placeholders in each duplicated row, collecting errors
+    {duplicated_rows, all_errors} =
+      Enum.reduce(duplicated_with_data, {[], []}, fn {row, scoped_data}, {rows_acc, errors_acc} ->
         case Replacement.replace_in_document(row, scoped_data) do
-          {:ok, replaced_row} -> replaced_row
-          {:error, _} -> row
+          {:ok, replaced_row} ->
+            {[replaced_row | rows_acc], errors_acc}
+
+          {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} ->
+            # Still add the row (will be filtered out if there are errors)
+            # but collect the errors for reporting
+            {[row | rows_acc], errors_acc ++ placeholders}
         end
       end)
 
-    # Insert duplicated rows first, then remove template rows
-    table
-    |> Table.insert_rows(duplicated_rows, group.position)
-    |> Table.remove_template_rows(group.rows)
+    # Reverse to maintain original order
+    duplicated_rows = Enum.reverse(duplicated_rows)
+
+    if all_errors == [] do
+      # Insert duplicated rows first, then remove template rows
+      modified_table =
+        table
+        |> Table.insert_rows(duplicated_rows, group.position)
+        |> Table.remove_template_rows(group.rows)
+
+      {:ok, modified_table}
+    else
+      {:error, Ootempl.PlaceholderError.exception(placeholders: all_errors)}
+    end
   end
 
   @spec replace_table_in_doc(Xml.xml_element(), Xml.xml_element(), Xml.xml_element()) ::
