@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-01
+
 ### Added
 - Hierarchical table support using block markers (`{{#list}}...{{/list}}`)
 - Support for nested parent-child data iteration in tables
@@ -14,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data scoping: child rows inherit parent data fields
 - Automatic removal of marker-only rows from output
 - New `Ootempl.Block` module for block marker detection and expansion
+
+### Fixed
+- Non-ASCII characters (Cyrillic, symbols, etc.) in templates causing `{:bad_character, N}` XML parsing errors ([#1](https://github.com/jcowgar/ootempl/issues/1))
+- Placeholder errors in repeating table rows now reported correctly instead of being silently ignored
 
 ## [0.1.0] - 2025-10-09
 
@@ -30,4 +36,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Relationship management for document components
 - Data validation and type checking
 
+[0.2.0]: https://github.com/jcowgar/ootempl/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jcowgar/ootempl/releases/tag/v0.1.0
