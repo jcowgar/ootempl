@@ -232,8 +232,7 @@ defmodule Ootempl.Block do
 
     # Find all markers with their row indices
     all_markers =
-      row_info
-      |> Enum.flat_map(fn info ->
+      Enum.flat_map(row_info, fn info ->
         Enum.map(info.markers, fn marker ->
           Map.put(marker, :row_index, info.index)
         end)
@@ -285,14 +284,15 @@ defmodule Ootempl.Block do
 
       # Expand header rows
       header_rows =
-        structure.header_rows
-        |> Enum.map(fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
+        Enum.map(structure.header_rows, fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
 
       # Expand body block (if any)
       body_rows =
         if structure.body_block do
           # For nested blocks, the list is within the current item
-          nested_data = Map.put(scoped_data, structure.body_block.list_key, Map.get(item, structure.body_block.list_key, []))
+          nested_data =
+            Map.put(scoped_data, structure.body_block.list_key, Map.get(item, structure.body_block.list_key, []))
+
           expand_nested_block(structure.body_block, rows, nested_data, scoped_data)
         else
           []
@@ -300,8 +300,7 @@ defmodule Ootempl.Block do
 
       # Expand footer rows
       footer_rows =
-        structure.footer_rows
-        |> Enum.map(fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
+        Enum.map(structure.footer_rows, fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
 
       header_rows ++ body_rows ++ footer_rows
     end)
@@ -323,7 +322,7 @@ defmodule Ootempl.Block do
         []
       end
 
-    (indices ++ nested_indices) |> Enum.sort()
+    Enum.sort(indices ++ nested_indices)
   end
 
   # Private functions
@@ -378,7 +377,8 @@ defmodule Ootempl.Block do
     if close.list_key == open.list_key do
       validate_pairs_recursive(rest, stack_rest)
     else
-      {:error, "Mismatched block: found {{/#{close.list_key}}} at position #{close.position}, expected {{/#{open.list_key}}}"}
+      {:error,
+       "Mismatched block: found {{/#{close.list_key}}} at position #{close.position}, expected {{/#{open.list_key}}}"}
     end
   end
 
@@ -475,15 +475,13 @@ defmodule Ootempl.Block do
 
     # Find rows between open and close markers (exclusive of marker rows)
     content_rows =
-      row_info
-      |> Enum.filter(fn info ->
+      Enum.filter(row_info, fn info ->
         info.index > open_row_idx and info.index < close_row_idx
       end)
 
     # Check for nested block markers
     nested_markers =
-      all_markers
-      |> Enum.filter(fn m ->
+      Enum.filter(all_markers, fn m ->
         m.row_index > open_row_idx and m.row_index < close_row_idx
       end)
 
@@ -505,13 +503,14 @@ defmodule Ootempl.Block do
           |> Enum.map(& &1.index)
 
         # Build nested block structure
-        nested_result = build_block_structure(
-          row_info,
-          nested_markers,
-          nested_open,
-          nested_close,
-          data
-        )
+        nested_result =
+          build_block_structure(
+            row_info,
+            nested_markers,
+            nested_open,
+            nested_close,
+            data
+          )
 
         case nested_result do
           {:ok, nested_structure} ->
@@ -577,21 +576,21 @@ defmodule Ootempl.Block do
 
       # Expand body rows (header_rows in nested context, since there's no further nesting)
       body_rows =
-        structure.header_rows
-        |> Enum.map(fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
+        Enum.map(structure.header_rows, fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
 
       # If there's deeper nesting, recurse
       deeper_rows =
         if structure.body_block do
-          deeper_data = Map.put(scoped_data, structure.body_block.list_key, Map.get(child_item, structure.body_block.list_key, []))
+          deeper_data =
+            Map.put(scoped_data, structure.body_block.list_key, Map.get(child_item, structure.body_block.list_key, []))
+
           expand_nested_block(structure.body_block, rows, deeper_data, scoped_data)
         else
           []
         end
 
       footer_rows =
-        structure.footer_rows
-        |> Enum.map(fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
+        Enum.map(structure.footer_rows, fn idx -> {clone_row(Enum.at(rows, idx)), scoped_data} end)
 
       body_rows ++ deeper_rows ++ footer_rows
     end)

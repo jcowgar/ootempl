@@ -157,7 +157,8 @@ defmodule OotemplTest do
           |> Enum.map(fn
             {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
           end)
-          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
+          # Exclude directory entries
+          |> Enum.reject(&String.ends_with?(&1, "/"))
           |> Enum.sort()
         after
           :zip.zip_close(zip_handle)
@@ -181,7 +182,8 @@ defmodule OotemplTest do
           |> Enum.map(fn
             {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
           end)
-          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
+          # Exclude directory entries
+          |> Enum.reject(&String.ends_with?(&1, "/"))
           |> Enum.sort()
         after
           :zip.zip_close(zip_handle)
@@ -1324,10 +1326,11 @@ defmodule OotemplTest do
       # Arrange - template with image placeholder
       template_path = "test/fixtures/image_validate_missing.docx"
 
-      file_map = OotemplTestHelpers.create_template_with_image(%{
-        image_name: "logo",
-        rel_id: "rId1"
-      })
+      file_map =
+        OotemplTestHelpers.create_template_with_image(%{
+          image_name: "logo",
+          rel_id: "rId1"
+        })
 
       Ootempl.Archive.create(file_map, template_path)
       on_exit(fn -> File.rm(template_path) end)
@@ -1346,10 +1349,11 @@ defmodule OotemplTest do
       # Arrange
       template_path = "test/fixtures/image_validate_file_missing.docx"
 
-      file_map = OotemplTestHelpers.create_template_with_image(%{
-        image_name: "logo",
-        rel_id: "rId1"
-      })
+      file_map =
+        OotemplTestHelpers.create_template_with_image(%{
+          image_name: "logo",
+          rel_id: "rId1"
+        })
 
       Ootempl.Archive.create(file_map, template_path)
       on_exit(fn -> File.rm(template_path) end)
@@ -1368,10 +1372,11 @@ defmodule OotemplTest do
       # Arrange
       template_path = "test/fixtures/image_validate_preloaded_missing.docx"
 
-      file_map = OotemplTestHelpers.create_template_with_image(%{
-        image_name: "logo",
-        rel_id: "rId1"
-      })
+      file_map =
+        OotemplTestHelpers.create_template_with_image(%{
+          image_name: "logo",
+          rel_id: "rId1"
+        })
 
       Ootempl.Archive.create(file_map, template_path)
       on_exit(fn -> File.rm(template_path) end)
@@ -1392,10 +1397,11 @@ defmodule OotemplTest do
       # Arrange
       template_path = "test/fixtures/image_validate_preloaded_file.docx"
 
-      file_map = OotemplTestHelpers.create_template_with_image(%{
-        image_name: "logo",
-        rel_id: "rId1"
-      })
+      file_map =
+        OotemplTestHelpers.create_template_with_image(%{
+          image_name: "logo",
+          rel_id: "rId1"
+        })
 
       Ootempl.Archive.create(file_map, template_path)
       on_exit(fn -> File.rm(template_path) end)
@@ -1418,15 +1424,18 @@ defmodule OotemplTest do
       image_path = "test/fixtures/test_image.png"
 
       # Create a simple 1x1 PNG image
-      File.write!(image_path, <<137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
-                                 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0,
-                                 0, 0, 12, 73, 68, 65, 84, 8, 215, 99, 248, 15, 0, 0, 1, 1, 1,
-                                 0, 24, 221, 141, 176, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130>>)
+      File.write!(
+        image_path,
+        <<137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119,
+          83, 222, 0, 0, 0, 12, 73, 68, 65, 84, 8, 215, 99, 248, 15, 0, 0, 1, 1, 1, 0, 24, 221, 141, 176, 0, 0, 0, 0, 73,
+          69, 78, 68, 174, 66, 96, 130>>
+      )
 
-      file_map = OotemplTestHelpers.create_template_with_image(%{
-        image_name: "logo",
-        rel_id: "rId1"
-      })
+      file_map =
+        OotemplTestHelpers.create_template_with_image(%{
+          image_name: "logo",
+          rel_id: "rId1"
+        })
 
       Ootempl.Archive.create(file_map, template_path)
 

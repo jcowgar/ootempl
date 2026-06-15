@@ -164,7 +164,7 @@ defmodule Ootempl.Integration.CyrillicTextTest do
 
       assert length(info.placeholders) == 2
 
-      originals = Enum.map(info.placeholders, & &1.original) |> Enum.sort()
+      originals = info.placeholders |> Enum.map(& &1.original) |> Enum.sort()
       assert originals == ["{{customer_name}}", "{{total}}"]
     end
   end

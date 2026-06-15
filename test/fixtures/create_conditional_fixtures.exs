@@ -289,16 +289,19 @@ defmodule ConditionalFixtureCreator do
 
       File.cd!(tmp_dir)
 
-      result = :zip.create(
-        to_charlist(abs_output_path),
-        files_list,
-        []
-      )
+      result =
+        :zip.create(
+          to_charlist(abs_output_path),
+          files_list,
+          []
+        )
 
       File.cd!(cwd)
 
       case result do
-        {:ok, _} -> :ok
+        {:ok, _} ->
+          :ok
+
         {:error, reason} ->
           IO.puts("Error creating zip: #{inspect(reason)}")
           raise "Failed to create zip: #{inspect(reason)}"

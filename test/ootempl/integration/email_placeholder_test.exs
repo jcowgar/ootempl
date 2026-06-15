@@ -26,6 +26,7 @@ defmodule Ootempl.Integration.EmailPlaceholderTest do
 
       if length(info.errors) > 0 do
         IO.puts("\nErrors found:")
+
         Enum.each(info.errors, fn error ->
           IO.puts("  - #{error.message} (#{error.type})")
         end)

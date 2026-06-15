@@ -196,11 +196,12 @@ defmodule Ootempl.BlockTest do
   describe "parse_table_structure/2" do
     test "parses single-level block" do
       # Build simple table XML with block markers
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{name}} - {{price}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{name}} - {{price}}",
+          "{{/items}}"
+        ])
 
       data = %{"items" => [%{"name" => "A", "price" => 10}]}
 
@@ -214,15 +215,16 @@ defmodule Ootempl.BlockTest do
     end
 
     test "parses nested block with header/body/footer" do
-      rows = build_test_rows([
-        "{{#categories}}",
-        "{{name}} - {{total}}",
-        "{{#items}}",
-        "{{item_name}} - {{price}}",
-        "{{/items}}",
-        "Subtotal: {{subtotal}}",
-        "{{/categories}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#categories}}",
+          "{{name}} - {{total}}",
+          "{{#items}}",
+          "{{item_name}} - {{price}}",
+          "{{/items}}",
+          "Subtotal: {{subtotal}}",
+          "{{/categories}}"
+        ])
 
       data = %{
         "categories" => [
@@ -241,17 +243,18 @@ defmodule Ootempl.BlockTest do
       assert structure.close_row_index == 6
       assert structure.header_rows == [1]
       assert structure.footer_rows == [5]
-      assert structure.body_block != nil
+      assert structure.body_block
       assert structure.body_block.list_key == "items"
       assert structure.body_block.header_rows == [3]
     end
 
     test "identifies marker-only rows" do
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{name}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{name}}",
+          "{{/items}}"
+        ])
 
       data = %{"items" => [%{"name" => "Test"}]}
 
@@ -262,10 +265,11 @@ defmodule Ootempl.BlockTest do
     end
 
     test "returns error for no block markers" do
-      rows = build_test_rows([
-        "{{name}}",
-        "{{price}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{name}}",
+          "{{price}}"
+        ])
 
       data = %{"name" => "Test", "price" => 10}
 
@@ -275,11 +279,12 @@ defmodule Ootempl.BlockTest do
 
   describe "expand_block/3" do
     test "expands single-level block" do
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{name}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{name}}",
+          "{{/items}}"
+        ])
 
       data = %{
         "items" => [
@@ -301,15 +306,16 @@ defmodule Ootempl.BlockTest do
     end
 
     test "expands nested block with correct scoping" do
-      rows = build_test_rows([
-        "{{#categories}}",
-        "{{category_name}}",
-        "{{#items}}",
-        "{{item_name}}",
-        "{{/items}}",
-        "{{subtotal}}",
-        "{{/categories}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#categories}}",
+          "{{category_name}}",
+          "{{#items}}",
+          "{{item_name}}",
+          "{{/items}}",
+          "{{subtotal}}",
+          "{{/categories}}"
+        ])
 
       data = %{
         "categories" => [
@@ -346,11 +352,12 @@ defmodule Ootempl.BlockTest do
     end
 
     test "returns empty for empty list" do
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{name}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{name}}",
+          "{{/items}}"
+        ])
 
       data = %{"items" => []}
 
@@ -361,14 +368,15 @@ defmodule Ootempl.BlockTest do
     end
 
     test "handles empty children list" do
-      rows = build_test_rows([
-        "{{#categories}}",
-        "{{name}}",
-        "{{#items}}",
-        "{{item}}",
-        "{{/items}}",
-        "{{/categories}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#categories}}",
+          "{{name}}",
+          "{{#items}}",
+          "{{item}}",
+          "{{/items}}",
+          "{{/categories}}"
+        ])
 
       data = %{
         "categories" => [
@@ -386,14 +394,15 @@ defmodule Ootempl.BlockTest do
     end
 
     test "parent data accessible in child scope" do
-      rows = build_test_rows([
-        "{{#orders}}",
-        "{{order_id}}",
-        "{{#items}}",
-        "{{order_id}} - {{item_name}}",
-        "{{/items}}",
-        "{{/orders}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#orders}}",
+          "{{order_id}}",
+          "{{#items}}",
+          "{{order_id}} - {{item_name}}",
+          "{{/items}}",
+          "{{/orders}}"
+        ])
 
       data = %{
         "orders" => [
@@ -418,11 +427,12 @@ defmodule Ootempl.BlockTest do
 
   describe "marker_row_indices/1" do
     test "returns indices for single-level block" do
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{name}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{name}}",
+          "{{/items}}"
+        ])
 
       data = %{"items" => []}
 
@@ -433,14 +443,15 @@ defmodule Ootempl.BlockTest do
     end
 
     test "returns indices for nested block" do
-      rows = build_test_rows([
-        "{{#outer}}",
-        "content",
-        "{{#inner}}",
-        "nested",
-        "{{/inner}}",
-        "{{/outer}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#outer}}",
+          "content",
+          "{{#inner}}",
+          "nested",
+          "{{/inner}}",
+          "{{/outer}}"
+        ])
 
       data = %{"outer" => [%{"inner" => []}]}
 
@@ -453,17 +464,18 @@ defmodule Ootempl.BlockTest do
 
   describe "edge cases and additional coverage" do
     test "handles deeply nested blocks (3 levels)" do
-      rows = build_test_rows([
-        "{{#level1}}",
-        "{{l1_name}}",
-        "{{#level2}}",
-        "{{l2_name}}",
-        "{{#level3}}",
-        "{{l3_name}}",
-        "{{/level3}}",
-        "{{/level2}}",
-        "{{/level1}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#level1}}",
+          "{{l1_name}}",
+          "{{#level2}}",
+          "{{l2_name}}",
+          "{{#level3}}",
+          "{{l3_name}}",
+          "{{/level3}}",
+          "{{/level2}}",
+          "{{/level1}}"
+        ])
 
       data = %{
         "level1" => [
@@ -489,10 +501,11 @@ defmodule Ootempl.BlockTest do
     end
 
     test "handles block with only marker rows and no content rows" do
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{/items}}"
+        ])
 
       data = %{"items" => [%{"name" => "test"}]}
 
@@ -504,14 +517,15 @@ defmodule Ootempl.BlockTest do
     end
 
     test "handles missing children key in data" do
-      rows = build_test_rows([
-        "{{#categories}}",
-        "{{name}}",
-        "{{#items}}",
-        "{{item}}",
-        "{{/items}}",
-        "{{/categories}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#categories}}",
+          "{{name}}",
+          "{{#items}}",
+          "{{item}}",
+          "{{/items}}",
+          "{{/categories}}"
+        ])
 
       data = %{
         "categories" => [
@@ -528,11 +542,12 @@ defmodule Ootempl.BlockTest do
     end
 
     test "handles non-list value at list key" do
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{name}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{name}}",
+          "{{/items}}"
+        ])
 
       data = %{
         "items" => "not a list"
@@ -555,9 +570,10 @@ defmodule Ootempl.BlockTest do
     end
 
     test "marker_row_indices returns empty for no markers" do
-      rows = build_test_rows([
-        "regular row"
-      ])
+      rows =
+        build_test_rows([
+          "regular row"
+        ])
 
       data = %{}
 
@@ -566,11 +582,12 @@ defmodule Ootempl.BlockTest do
     end
 
     test "handles non-map child data gracefully" do
-      rows = build_test_rows([
-        "{{#items}}",
-        "{{name}}",
-        "{{/items}}"
-      ])
+      rows =
+        build_test_rows([
+          "{{#items}}",
+          "{{name}}",
+          "{{/items}}"
+        ])
 
       # Items contains non-map values
       data = %{

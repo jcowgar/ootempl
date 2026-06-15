@@ -274,11 +274,11 @@ defmodule Ootempl.Integration.ConditionalFixtureTest do
           c.condition == "customer.profile.verified"
         end)
 
-      assert customer_active != nil
+      assert customer_active
       assert customer_active.path == ["customer", "active"]
       assert :document_body in customer_active.locations
 
-      assert customer_verified != nil
+      assert customer_verified
       assert customer_verified.path == ["customer", "profile", "verified"]
       assert :document_body in customer_verified.locations
     end

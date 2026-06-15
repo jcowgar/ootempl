@@ -204,7 +204,7 @@ defmodule Ootempl.InspectTest do
 
     test "returns error for invalid .docx file" do
       # Create a temporary invalid file
-      invalid_path = Path.join(System.tmp_dir!(), "invalid_test_#{:rand.uniform(10000)}.docx")
+      invalid_path = Path.join(System.tmp_dir!(), "invalid_test_#{:rand.uniform(10_000)}.docx")
       File.write!(invalid_path, "not a valid docx file")
 
       assert {:error, _reason} = Ootempl.inspect(invalid_path)
@@ -297,7 +297,7 @@ defmodule Ootempl.InspectTest do
   describe "inspect_template/1 error handling" do
     test "cleanup happens even if inspection has errors" do
       # Use an invalid template that will fail during processing
-      invalid_path = Path.join(System.tmp_dir!(), "inspect_error_#{:rand.uniform(10000)}.docx")
+      invalid_path = Path.join(System.tmp_dir!(), "inspect_error_#{:rand.uniform(10_000)}.docx")
 
       # Create a minimal but invalid .docx (valid ZIP but invalid XML)
       File.write!(invalid_path, <<80, 75, 3, 4>>)
@@ -394,7 +394,7 @@ defmodule Ootempl.InspectTest do
 
       # All results should be identical
       infos = Enum.map(results, fn {:ok, info} -> info end)
-      assert Enum.uniq(infos) |> length() == 1
+      assert infos |> Enum.uniq() |> length() == 1
     end
 
     test "works with templates containing headers and footers" do

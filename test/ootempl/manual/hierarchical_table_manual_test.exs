@@ -141,23 +141,48 @@ defmodule Ootempl.Manual.HierarchicalTableManualTest do
             "category_name" => "Software Licenses",
             "category_total" => "$15,000.00",
             "items" => [
-              %{"item_name" => "Enterprise Suite - Annual License", "qty" => "5", "unit_price" => "$2,000.00", "line_total" => "$10,000.00"},
-              %{"item_name" => "Developer Tools Add-on", "qty" => "10", "unit_price" => "$500.00", "line_total" => "$5,000.00"}
+              %{
+                "item_name" => "Enterprise Suite - Annual License",
+                "qty" => "5",
+                "unit_price" => "$2,000.00",
+                "line_total" => "$10,000.00"
+              },
+              %{
+                "item_name" => "Developer Tools Add-on",
+                "qty" => "10",
+                "unit_price" => "$500.00",
+                "line_total" => "$5,000.00"
+              }
             ]
           },
           %{
             "category_name" => "Professional Services",
             "category_total" => "$8,400.00",
             "items" => [
-              %{"item_name" => "Implementation Consulting (hours)", "qty" => "40", "unit_price" => "$150.00", "line_total" => "$6,000.00"},
-              %{"item_name" => "Training Session (per session)", "qty" => "4", "unit_price" => "$600.00", "line_total" => "$2,400.00"}
+              %{
+                "item_name" => "Implementation Consulting (hours)",
+                "qty" => "40",
+                "unit_price" => "$150.00",
+                "line_total" => "$6,000.00"
+              },
+              %{
+                "item_name" => "Training Session (per session)",
+                "qty" => "4",
+                "unit_price" => "$600.00",
+                "line_total" => "$2,400.00"
+              }
             ]
           },
           %{
             "category_name" => "Hardware",
             "category_total" => "$3,200.00",
             "items" => [
-              %{"item_name" => "Security Token (USB)", "qty" => "20", "unit_price" => "$80.00", "line_total" => "$1,600.00"},
+              %{
+                "item_name" => "Security Token (USB)",
+                "qty" => "20",
+                "unit_price" => "$80.00",
+                "line_total" => "$1,600.00"
+              },
               %{"item_name" => "Backup Drive (1TB)", "qty" => "4", "unit_price" => "$400.00", "line_total" => "$1,600.00"}
             ]
           }

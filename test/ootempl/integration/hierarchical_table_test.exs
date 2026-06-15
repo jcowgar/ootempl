@@ -16,11 +16,11 @@ defmodule Ootempl.Integration.HierarchicalTableTest do
 
   setup do
     # Create fixtures if they don't exist
-    unless File.exists?(@hierarchical_template_path) do
+    if !File.exists?(@hierarchical_template_path) do
       FixtureHelper.create_hierarchical_table_docx(@hierarchical_template_path)
     end
 
-    unless File.exists?(@simple_block_template_path) do
+    if !File.exists?(@simple_block_template_path) do
       FixtureHelper.create_simple_block_table_docx(@simple_block_template_path)
     end
 

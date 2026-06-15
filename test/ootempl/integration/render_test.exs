@@ -291,7 +291,8 @@ defmodule Ootempl.Integration.RenderTest do
             {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
             _ -> ""
           end)
-          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
+          # Exclude directory entries
+          |> Enum.reject(&String.ends_with?(&1, "/"))
           |> length()
         after
           :zip.zip_close(zip_handle)
@@ -312,7 +313,8 @@ defmodule Ootempl.Integration.RenderTest do
             {:zip_file, name, _file_info, _comment, _offset, _comp_size} -> List.to_string(name)
             _ -> ""
           end)
-          |> Enum.reject(&String.ends_with?(&1, "/"))  # Exclude directory entries
+          # Exclude directory entries
+          |> Enum.reject(&String.ends_with?(&1, "/"))
           |> length()
         after
           :zip.zip_close(zip_handle)
