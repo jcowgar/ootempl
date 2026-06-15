@@ -9,8 +9,8 @@ defmodule Ootempl.Integration.FiltersRenderTest do
 
   alias Ootempl.FixtureHelper
 
-  @template "test/fixtures/filters_template.docx"
-  @output "test/fixtures/filters_output.docx"
+  @template "tmp/filters_template.docx"
+  @output "tmp/filters_output.docx"
 
   setup do
     on_exit(fn ->

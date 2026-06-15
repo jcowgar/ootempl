@@ -14,7 +14,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
   import Ootempl.Xml
 
   @template_path "test/fixtures/Table Repeating Rows from Word.docx"
-  @output_path "test/fixtures/table_repeating_word_output.docx"
+  @output_path "tmp/table_repeating_word_output.docx"
 
   setup do
     on_exit(fn ->
@@ -328,7 +328,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       }
 
       # Generated output goes to the git-ignored tmp/ dir, left for manual review
-      manual_output_path = OotemplTestHelpers.tmp_path("table_repeating_word_manual.docx")
+      manual_output_path = "tmp/table_repeating_word_manual.docx"
       on_exit(fn -> :ok end)
 
       # Act

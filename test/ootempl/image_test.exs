@@ -17,7 +17,7 @@ defmodule Ootempl.ImageTest do
 
     test "returns error for non-existent file" do
       # Arrange
-      image_path = "test/fixtures/nonexistent.png"
+      image_path = "tmp/nonexistent.png"
 
       # Act
       result = Image.validate_image_file(image_path)
@@ -29,7 +29,7 @@ defmodule Ootempl.ImageTest do
     test "returns error for unsupported format" do
       # Arrange
       # Create a temporary file with wrong extension
-      temp_path = "test/fixtures/temp_test.bmp"
+      temp_path = "tmp/temp_test.bmp"
       File.write!(temp_path, "fake content")
 
       # Act
@@ -72,7 +72,7 @@ defmodule Ootempl.ImageTest do
 
     test "returns error for non-existent file" do
       # Arrange
-      image_path = "test/fixtures/missing.png"
+      image_path = "tmp/missing.png"
 
       # Act
       result = Image.get_image_dimensions(image_path)
@@ -83,7 +83,7 @@ defmodule Ootempl.ImageTest do
 
     test "returns error for corrupt image" do
       # Arrange
-      corrupt_path = "test/fixtures/corrupt_image.png"
+      corrupt_path = "tmp/corrupt_image.png"
       File.write!(corrupt_path, "not an image")
 
       # Act
@@ -99,7 +99,7 @@ defmodule Ootempl.ImageTest do
     test "reads dimensions from GIF87a format" do
       # Arrange
       # Create minimal GIF87a file with 50x30 dimensions
-      gif87a_path = "test/fixtures/test_gif87a.gif"
+      gif87a_path = "tmp/test_gif87a.gif"
       gif87a_data = "GIF87a" <> <<50::little-16, 30::little-16>> <> <<0, 0, 0>>
       File.write!(gif87a_path, gif87a_data)
 
@@ -116,7 +116,7 @@ defmodule Ootempl.ImageTest do
     test "reads dimensions from GIF89a format" do
       # Arrange
       # Create minimal GIF89a file with 100x200 dimensions
-      gif89a_path = "test/fixtures/test_gif89a.gif"
+      gif89a_path = "tmp/test_gif89a.gif"
       gif89a_data = "GIF89a" <> <<100::little-16, 200::little-16>> <> <<0, 0, 0>>
       File.write!(gif89a_path, gif89a_data)
 
@@ -132,7 +132,7 @@ defmodule Ootempl.ImageTest do
 
     test "returns error for truncated GIF file" do
       # Arrange
-      truncated_gif_path = "test/fixtures/truncated.gif"
+      truncated_gif_path = "tmp/truncated.gif"
       # GIF header but not enough data for dimensions
       File.write!(truncated_gif_path, "GIF89a" <> <<1>>)
 
@@ -148,7 +148,7 @@ defmodule Ootempl.ImageTest do
 
     test "returns error for truncated PNG file" do
       # Arrange
-      truncated_png_path = "test/fixtures/truncated.png"
+      truncated_png_path = "tmp/truncated.png"
       # PNG signature but no IHDR chunk
       File.write!(truncated_png_path, <<0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A>>)
 
@@ -164,7 +164,7 @@ defmodule Ootempl.ImageTest do
 
     test "returns error for truncated JPEG file" do
       # Arrange
-      truncated_jpeg_path = "test/fixtures/truncated.jpg"
+      truncated_jpeg_path = "tmp/truncated.jpg"
       # JPEG signature but no valid markers
       File.write!(truncated_jpeg_path, <<0xFF, 0xD8, 0xFF>>)
 
@@ -181,7 +181,7 @@ defmodule Ootempl.ImageTest do
     test "handles JPEG with escaped FF bytes" do
       # Arrange
       # Create JPEG with 0xFF00 marker (escaped FF byte) before SOF
-      jpeg_with_escape_path = "test/fixtures/jpeg_with_escape.jpg"
+      jpeg_with_escape_path = "tmp/jpeg_with_escape.jpg"
       # JPEG signature + escaped FF + SOF0 marker with dimensions
       # Escaped FF byte
       # SOF0 marker (0xFFC0)

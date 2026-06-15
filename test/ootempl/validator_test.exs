@@ -47,7 +47,7 @@ defmodule Ootempl.ValidatorTest do
   describe "validate_docx/1 - file existence errors" do
     test "returns error for non-existent file" do
       # Arrange
-      path = "test/fixtures/nonexistent.docx"
+      path = "tmp/nonexistent.docx"
 
       # Act
       result = Validator.validate_docx(path)
@@ -78,7 +78,7 @@ defmodule Ootempl.ValidatorTest do
   describe "validate_docx/1 - invalid archive errors" do
     test "returns error for corrupt ZIP archive" do
       # Arrange
-      corrupt_path = "test/fixtures/corrupt_archive.docx"
+      corrupt_path = "tmp/corrupt_archive.docx"
       File.write!(corrupt_path, "This is not a ZIP file")
 
       # Act
@@ -96,7 +96,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "returns error for empty file" do
       # Arrange
-      empty_path = "test/fixtures/empty.docx"
+      empty_path = "tmp/empty.docx"
       File.write!(empty_path, "")
 
       # Act
@@ -113,7 +113,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "returns error for partially corrupt ZIP" do
       # Arrange
-      partial_path = "test/fixtures/partial.docx"
+      partial_path = "tmp/partial.docx"
       # Write a ZIP header but incomplete content
       File.write!(partial_path, <<80, 75, 3, 4>>)
 
@@ -132,7 +132,7 @@ defmodule Ootempl.ValidatorTest do
     test "returns error when word/document.xml is missing" do
       # Arrange
       # Create a minimal ZIP without word/document.xml
-      missing_doc_path = "test/fixtures/missing_document.docx"
+      missing_doc_path = "tmp/missing_document.docx"
 
       files = [
         {~c"[Content_Types].xml", "<Types/>"},
@@ -156,7 +156,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "returns error when [Content_Types].xml is missing" do
       # Arrange
-      missing_content_types_path = "test/fixtures/missing_content_types.docx"
+      missing_content_types_path = "tmp/missing_content_types.docx"
 
       files = [
         {~c"word/document.xml", "<document/>"},
@@ -179,7 +179,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "returns error when _rels/.rels is missing" do
       # Arrange
-      missing_rels_path = "test/fixtures/missing_rels.docx"
+      missing_rels_path = "tmp/missing_rels.docx"
 
       files = [
         {~c"word/document.xml", "<document/>"},
@@ -202,7 +202,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "returns first missing file when multiple files are missing" do
       # Arrange
-      multiple_missing_path = "test/fixtures/multiple_missing.docx"
+      multiple_missing_path = "tmp/multiple_missing.docx"
 
       # Only include one of the three required files
       files = [
@@ -228,7 +228,7 @@ defmodule Ootempl.ValidatorTest do
   describe "validate_docx/1 - malformed XML errors" do
     test "returns error for malformed word/document.xml" do
       # Arrange
-      malformed_xml_path = "test/fixtures/malformed_xml.docx"
+      malformed_xml_path = "tmp/malformed_xml.docx"
 
       files = [
         {~c"word/document.xml", "<document><unclosed>"},
@@ -254,7 +254,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "returns error for document.xml with invalid characters" do
       # Arrange
-      invalid_chars_path = "test/fixtures/invalid_chars_xml.docx"
+      invalid_chars_path = "tmp/invalid_chars_xml.docx"
 
       # Use a control character that's invalid in XML
       files = [
@@ -277,7 +277,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "returns error for empty document.xml" do
       # Arrange
-      empty_xml_path = "test/fixtures/empty_xml.docx"
+      empty_xml_path = "tmp/empty_xml.docx"
 
       files = [
         {~c"word/document.xml", ""},
@@ -299,7 +299,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "validates well-formed but minimal document.xml" do
       # Arrange
-      minimal_xml_path = "test/fixtures/minimal_xml.docx"
+      minimal_xml_path = "tmp/minimal_xml.docx"
 
       files = [
         {~c"word/document.xml",
@@ -324,7 +324,7 @@ defmodule Ootempl.ValidatorTest do
   describe "validate_docx/1 - validation order" do
     test "checks file existence before archive validation" do
       # Arrange
-      nonexistent_path = "test/fixtures/does_not_exist.docx"
+      nonexistent_path = "tmp/does_not_exist.docx"
 
       # Act
       result = Validator.validate_docx(nonexistent_path)
@@ -336,7 +336,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "checks archive validity before structure validation" do
       # Arrange
-      corrupt_path = "test/fixtures/corrupt_for_order_test.docx"
+      corrupt_path = "tmp/corrupt_for_order_test.docx"
       File.write!(corrupt_path, "not a zip")
 
       # Act
@@ -352,7 +352,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "checks structure before XML validation" do
       # Arrange
-      missing_file_path = "test/fixtures/missing_for_order_test.docx"
+      missing_file_path = "tmp/missing_for_order_test.docx"
 
       # Create ZIP with malformed XML but missing required file
       files = [
@@ -389,7 +389,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "handles paths with spaces" do
       # Arrange
-      space_path = "test/fixtures/temp with spaces.docx"
+      space_path = "tmp/temp with spaces.docx"
       File.cp!(@valid_template, space_path)
 
       # Act
@@ -404,7 +404,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "handles paths with special characters" do
       # Arrange
-      special_path = "test/fixtures/temp-special_file(1).docx"
+      special_path = "tmp/temp-special_file(1).docx"
       File.cp!(@valid_template, special_path)
 
       # Act
@@ -419,7 +419,7 @@ defmodule Ootempl.ValidatorTest do
 
     test "handles Unicode characters in path" do
       # Arrange
-      unicode_path = "test/fixtures/文档.docx"
+      unicode_path = "tmp/文档.docx"
       File.cp!(@valid_template, unicode_path)
 
       # Act

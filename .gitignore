@@ -19,11 +19,8 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 ootempl-*.tar
 
-# Temporary files, for example, from tests.
+# Temporary files and all test-generated artifacts (rendered/manual outputs).
 /tmp/
-
-# Manual verification test outputs (generated, not hand-crafted)
-test/fixtures/manual/
 
 # macOS files
 .DS_Store

@@ -4,7 +4,7 @@ defmodule OotemplTest do
   doctest Ootempl
 
   @test_fixture "test/fixtures/Simple Placeholdes from Word.docx"
-  @output_path "test/fixtures/output_test.docx"
+  @output_path "tmp/output_test.docx"
   # Template has @person.first_name@ and @date@ placeholders
   @valid_data %{"person" => %{"first_name" => "Test User"}, "date" => "2025-10-06"}
 
@@ -212,7 +212,7 @@ defmodule OotemplTest do
 
     test "cleans up temp directory even when XML parsing fails" do
       # Arrange - use a .docx with malformed XML
-      malformed_path = "test/fixtures/malformed_xml.docx"
+      malformed_path = "tmp/malformed_xml.docx"
       output_path = @output_path
       temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
 
@@ -304,7 +304,7 @@ defmodule OotemplTest do
 
     test "handles extraction failure gracefully" do
       # Arrange - use a file that's not a valid ZIP
-      invalid_zip = "test/fixtures/not_a_zip.txt"
+      invalid_zip = "tmp/not_a_zip.txt"
       File.write!(invalid_zip, "This is just plain text, not a ZIP file")
       output_path = @output_path
 
@@ -320,7 +320,7 @@ defmodule OotemplTest do
 
     test "handles missing word/document.xml in extracted archive" do
       # Arrange - create a .docx without word/document.xml
-      incomplete_path = "test/fixtures/incomplete.docx"
+      incomplete_path = "tmp/incomplete.docx"
 
       file_map = %{
         "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
@@ -406,7 +406,7 @@ defmodule OotemplTest do
 
       test_cases = [
         # Malformed XML - fails at parsing
-        {"test/fixtures/malformed_for_cleanup.docx",
+        {"tmp/malformed_for_cleanup.docx",
          %{
            "word/document.xml" => "<bad><xml>",
            "[Content_Types].xml" => "<?xml version=\"1.0\"?><Types></Types>",
@@ -430,7 +430,7 @@ defmodule OotemplTest do
           |> length()
 
         # Act
-        result = Ootempl.render(test_file, @valid_data, "test/fixtures/out.docx")
+        result = Ootempl.render(test_file, @valid_data, "tmp/out.docx")
 
         # Assert
         assert {:error, _} = result
@@ -464,7 +464,7 @@ defmodule OotemplTest do
       data = %{person: %{first_name: "Struct User"}, date: "2025-10-07"}
 
       template_path = @test_fixture
-      output_path = "test/fixtures/output_struct_test.docx"
+      output_path = "tmp/output_struct_test.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -495,8 +495,8 @@ defmodule OotemplTest do
       }
 
       # Create a template that uses nested struct paths
-      template_path = "test/fixtures/nested_struct_template.docx"
-      output_path = "test/fixtures/output_nested_struct.docx"
+      template_path = "tmp/nested_struct_template.docx"
+      output_path = "tmp/output_nested_struct.docx"
 
       # Create template with nested placeholders like @customer.name@, @customer.address.city@
       file_map = %{
@@ -544,8 +544,8 @@ defmodule OotemplTest do
         address: nil
       }
 
-      template_path = "test/fixtures/case_insensitive_struct.docx"
-      output_path = "test/fixtures/output_case_insensitive.docx"
+      template_path = "tmp/case_insensitive_struct.docx"
+      output_path = "tmp/output_case_insensitive.docx"
 
       # Create template with different case variations
       file_map = %{
@@ -588,8 +588,8 @@ defmodule OotemplTest do
         %Customer{name: "Customer 2", email: "c2@example.com", address: nil}
       ]
 
-      template_path = "test/fixtures/struct_list_template.docx"
-      output_path = "test/fixtures/output_struct_list.docx"
+      template_path = "tmp/struct_list_template.docx"
+      output_path = "tmp/output_struct_list.docx"
 
       # Create template that accesses list items
       file_map = %{
@@ -633,8 +633,8 @@ defmodule OotemplTest do
         address: nil
       }
 
-      template_path = "test/fixtures/nil_field_template.docx"
-      output_path = "test/fixtures/output_nil_field.docx"
+      template_path = "tmp/nil_field_template.docx"
+      output_path = "tmp/output_nil_field.docx"
 
       # Create template that tries to access nil field
       file_map = %{
@@ -677,8 +677,8 @@ defmodule OotemplTest do
         address: nil
       }
 
-      template_path = "test/fixtures/mixed_data_template.docx"
-      output_path = "test/fixtures/output_mixed_data.docx"
+      template_path = "tmp/mixed_data_template.docx"
+      output_path = "tmp/output_mixed_data.docx"
 
       # Create template
       file_map = %{
@@ -725,9 +725,9 @@ defmodule OotemplTest do
   describe "error handling" do
     test "returns error for non-existent template file" do
       # Arrange
-      template_path = "test/fixtures/nonexistent.docx"
+      template_path = "tmp/nonexistent.docx"
       data = %{"name" => "test"}
-      output_path = "test/fixtures/output.docx"
+      output_path = "tmp/output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -740,10 +740,10 @@ defmodule OotemplTest do
     test "returns error for invalid ZIP archive" do
       # Arrange
       # Create a file that's not a valid ZIP
-      template_path = "test/fixtures/invalid_archive.docx"
+      template_path = "tmp/invalid_archive.docx"
       File.write!(template_path, "This is not a ZIP file")
       data = %{"name" => "test"}
-      output_path = "test/fixtures/output.docx"
+      output_path = "tmp/output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -758,7 +758,7 @@ defmodule OotemplTest do
 
     test "load/1 returns error for non-existent file" do
       # Arrange
-      template_path = "test/fixtures/missing.docx"
+      template_path = "tmp/missing.docx"
 
       # Act
       result = Ootempl.load(template_path)
@@ -770,7 +770,7 @@ defmodule OotemplTest do
 
     test "load/1 returns error for invalid archive" do
       # Arrange
-      template_path = "test/fixtures/bad_archive.docx"
+      template_path = "tmp/bad_archive.docx"
       File.write!(template_path, "Not a ZIP")
 
       # Act
@@ -790,7 +790,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = %{}
-      output_path = "test/fixtures/empty_data_output.docx"
+      output_path = "tmp/empty_data_output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -808,7 +808,7 @@ defmodule OotemplTest do
       template_path = @test_fixture
       large_string = String.duplicate("A", 10_000)
       data = %{"person" => %{"first_name" => large_string}, "date" => "2025-10-06"}
-      output_path = "test/fixtures/large_value_output.docx"
+      output_path = "tmp/large_value_output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -826,7 +826,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = %{"person" => %{"first_name" => "<>&\"'"}, "date" => "2025-10-06"}
-      output_path = "test/fixtures/special_chars_output.docx"
+      output_path = "tmp/special_chars_output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -846,7 +846,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = %{"person" => %{"first_name" => "你好世界 🌍 émojis"}, "date" => "2025-10-06"}
-      output_path = "test/fixtures/unicode_output.docx"
+      output_path = "tmp/unicode_output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -866,7 +866,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = @valid_data
-      output_path = "test/fixtures/nonexistent_dir/output.docx"
+      output_path = "tmp/nonexistent_dir/output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -886,9 +886,9 @@ defmodule OotemplTest do
       data2 = %{"person" => %{"first_name" => "Second"}, "date" => "2025-02-02"}
       data3 = %{"person" => %{"first_name" => "Third"}, "date" => "2025-03-03"}
 
-      output1 = "test/fixtures/batch1.docx"
-      output2 = "test/fixtures/batch2.docx"
-      output3 = "test/fixtures/batch3.docx"
+      output1 = "tmp/batch1.docx"
+      output2 = "tmp/batch2.docx"
+      output3 = "tmp/batch3.docx"
 
       # Act
       result1 = Ootempl.render(template, data1, output1)
@@ -931,7 +931,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = @valid_data
-      output_path = "test/fixtures/props_output.docx"
+      output_path = "tmp/props_output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -952,7 +952,7 @@ defmodule OotemplTest do
       template_path = @test_fixture
       # Data that would make condition true, but markers are malformed in template
       data = @valid_data
-      output_path = "test/fixtures/unmatched_if_output.docx"
+      output_path = "tmp/unmatched_if_output.docx"
 
       # Note: Current implementation processes conditionals iteratively
       # Unmatched markers might be left as-is or cause errors depending on implementation
@@ -972,7 +972,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = @valid_data
-      output_path = "test/fixtures/empty_conditional_output.docx"
+      output_path = "tmp/empty_conditional_output.docx"
 
       # Act - Process template that may have empty conditional sections
       result = Ootempl.render(template_path, data, output_path)
@@ -990,7 +990,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = @valid_data
-      output_path = "test/fixtures/nested_xml_output.docx"
+      output_path = "tmp/nested_xml_output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -1006,7 +1006,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = @valid_data
-      output_path = "test/fixtures/namespace_output.docx"
+      output_path = "tmp/namespace_output.docx"
 
       # Act
       result = Ootempl.render(template_path, data, output_path)
@@ -1058,7 +1058,7 @@ defmodule OotemplTest do
 
     test "returns error for invalid .docx file" do
       # Arrange
-      invalid_path = "test/fixtures/invalid_for_validate.txt"
+      invalid_path = "tmp/invalid_for_validate.txt"
       File.write!(invalid_path, "This is not a .docx file")
       data = @valid_data
 
@@ -1242,7 +1242,7 @@ defmodule OotemplTest do
   describe "validate/2 with conditionals" do
     test "validates template with conditional sections" do
       # Arrange - create template with conditionals
-      template_path = "test/fixtures/conditional_validate.docx"
+      template_path = "tmp/conditional_validate.docx"
 
       file_map = %{
         "word/document.xml" => """
@@ -1275,7 +1275,7 @@ defmodule OotemplTest do
 
     test "validates template with false conditional" do
       # Arrange - create template with conditionals
-      template_path = "test/fixtures/conditional_false_validate.docx"
+      template_path = "tmp/conditional_false_validate.docx"
 
       file_map = %{
         "word/document.xml" => """
@@ -1324,7 +1324,7 @@ defmodule OotemplTest do
   describe "validate/2 with image placeholders" do
     test "returns ImageError for missing image data (file path)" do
       # Arrange - template with image placeholder
-      template_path = "test/fixtures/image_validate_missing.docx"
+      template_path = "tmp/image_validate_missing.docx"
 
       file_map =
         OotemplTestHelpers.create_template_with_image(%{
@@ -1347,7 +1347,7 @@ defmodule OotemplTest do
 
     test "returns ImageError for missing image file (file path)" do
       # Arrange
-      template_path = "test/fixtures/image_validate_file_missing.docx"
+      template_path = "tmp/image_validate_file_missing.docx"
 
       file_map =
         OotemplTestHelpers.create_template_with_image(%{
@@ -1370,7 +1370,7 @@ defmodule OotemplTest do
 
     test "returns ImageError for missing image data (pre-loaded template)" do
       # Arrange
-      template_path = "test/fixtures/image_validate_preloaded_missing.docx"
+      template_path = "tmp/image_validate_preloaded_missing.docx"
 
       file_map =
         OotemplTestHelpers.create_template_with_image(%{
@@ -1395,7 +1395,7 @@ defmodule OotemplTest do
 
     test "returns ImageError for missing image file (pre-loaded template)" do
       # Arrange
-      template_path = "test/fixtures/image_validate_preloaded_file.docx"
+      template_path = "tmp/image_validate_preloaded_file.docx"
 
       file_map =
         OotemplTestHelpers.create_template_with_image(%{
@@ -1420,8 +1420,8 @@ defmodule OotemplTest do
 
     test "validates successfully with valid image (file path)" do
       # Arrange
-      template_path = "test/fixtures/image_validate_success.docx"
-      image_path = "test/fixtures/test_image.png"
+      template_path = "tmp/image_validate_success.docx"
+      image_path = "tmp/test_image.png"
 
       # Create a simple 1x1 PNG image
       File.write!(
@@ -1459,7 +1459,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = @valid_data
-      output_path = "test/fixtures/validate_then_render.docx"
+      output_path = "tmp/validate_then_render.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -1477,7 +1477,7 @@ defmodule OotemplTest do
       # Arrange
       template_path = @test_fixture
       data = %{}
-      output_path = "test/fixtures/validate_fail_render_fail.docx"
+      output_path = "tmp/validate_fail_render_fail.docx"
 
       # Act
       validate_result = Ootempl.validate(template_path, data)
@@ -1513,7 +1513,7 @@ defmodule OotemplTest do
         valid_customers
         |> Enum.with_index()
         |> Enum.map(fn {customer, i} ->
-          output = "test/fixtures/batch_validate_#{i}.docx"
+          output = "tmp/batch_validate_#{i}.docx"
           Ootempl.render(template, customer, output)
           output
         end)

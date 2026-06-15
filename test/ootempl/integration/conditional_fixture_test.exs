@@ -12,7 +12,7 @@ defmodule Ootempl.Integration.ConditionalFixtureTest do
   use ExUnit.Case
 
   @fixtures_dir "test/fixtures"
-  @output_dir "test/fixtures/conditional_fixture_outputs"
+  @output_dir "tmp/conditional_fixture_outputs"
 
   setup_all do
     # Ensure output directory exists

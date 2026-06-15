@@ -11,7 +11,7 @@ defmodule Ootempl.Integration.UnicodeEndashTest do
 
   alias Ootempl.Archive
 
-  @tmp_dir "test/fixtures/tmp_unicode_test"
+  @tmp_dir "tmp/unicode_test"
 
   setup do
     File.mkdir_p!(@tmp_dir)

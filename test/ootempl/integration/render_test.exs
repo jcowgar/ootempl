@@ -12,7 +12,7 @@ defmodule Ootempl.Integration.RenderTest do
   import Ootempl.Xml
 
   @test_fixture "test/fixtures/Simple Placeholdes from Word.docx"
-  @output_path "test/fixtures/integration_output.docx"
+  @output_path "tmp/integration_output.docx"
 
   setup do
     # Clean up output files after each test
@@ -326,8 +326,8 @@ defmodule Ootempl.Integration.RenderTest do
     test "can render multiple times without interference" do
       # Arrange
       template_path = @test_fixture
-      output1 = "test/fixtures/multi_output1.docx"
-      output2 = "test/fixtures/multi_output2.docx"
+      output1 = "tmp/multi_output1.docx"
+      output2 = "tmp/multi_output2.docx"
       data = %{"person" => %{"first_name" => "Test"}, "date" => "Test"}
 
       on_exit(fn ->
@@ -369,7 +369,7 @@ defmodule Ootempl.Integration.RenderTest do
   describe "error handling in integration scenarios" do
     test "gracefully handles corrupted template file" do
       # Arrange - create corrupted file
-      corrupted_path = "test/fixtures/corrupted.docx"
+      corrupted_path = "tmp/corrupted.docx"
       File.write!(corrupted_path, "This is not a valid ZIP/docx file")
 
       on_exit(fn ->
@@ -386,7 +386,7 @@ defmodule Ootempl.Integration.RenderTest do
 
     test "cleans up temp files even when processing fails" do
       # Arrange
-      corrupted_path = "test/fixtures/corrupted2.docx"
+      corrupted_path = "tmp/corrupted2.docx"
       File.write!(corrupted_path, "Invalid content")
       temp_dir_pattern = Path.join(System.tmp_dir!(), "ootempl_*")
 
@@ -429,7 +429,7 @@ defmodule Ootempl.Integration.RenderTest do
         "total" => "350.50"
       }
 
-      output_path = "test/fixtures/table_simple_output.docx"
+      output_path = "tmp/table_simple_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -464,7 +464,7 @@ defmodule Ootempl.Integration.RenderTest do
         "total" => "0.00"
       }
 
-      output_path = "test/fixtures/table_empty_output.docx"
+      output_path = "tmp/table_empty_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -494,7 +494,7 @@ defmodule Ootempl.Integration.RenderTest do
         "total" => "125.00"
       }
 
-      output_path = "test/fixtures/table_mixed_output.docx"
+      output_path = "tmp/table_mixed_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -521,7 +521,7 @@ defmodule Ootempl.Integration.RenderTest do
         ]
       }
 
-      output_path = "test/fixtures/table_multirow_output.docx"
+      output_path = "tmp/table_multirow_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -551,7 +551,7 @@ defmodule Ootempl.Integration.RenderTest do
         ]
       }
 
-      output_path = "test/fixtures/table_multiple_output.docx"
+      output_path = "tmp/table_multiple_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -580,7 +580,7 @@ defmodule Ootempl.Integration.RenderTest do
         ]
       }
 
-      output_path = "test/fixtures/table_with_variables_output.docx"
+      output_path = "tmp/table_with_variables_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -609,7 +609,7 @@ defmodule Ootempl.Integration.RenderTest do
         "total" => "999.99"
       }
 
-      output_path = "test/fixtures/table_from_word_output.docx"
+      output_path = "tmp/table_from_word_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -632,7 +632,7 @@ defmodule Ootempl.Integration.RenderTest do
         "total" => "100"
       }
 
-      output_path = "test/fixtures/table_no_template_output.docx"
+      output_path = "tmp/table_no_template_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -679,7 +679,7 @@ defmodule Ootempl.Integration.RenderTest do
         "date" => "2025"
       }
 
-      output_path = "test/fixtures/header_output.docx"
+      output_path = "tmp/header_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -706,7 +706,7 @@ defmodule Ootempl.Integration.RenderTest do
         "date" => "2025"
       }
 
-      output_path = "test/fixtures/footer_output.docx"
+      output_path = "tmp/footer_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -732,7 +732,7 @@ defmodule Ootempl.Integration.RenderTest do
         "date" => "2025"
       }
 
-      output_path = "test/fixtures/multiple_headers_output.docx"
+      output_path = "tmp/multiple_headers_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -759,7 +759,7 @@ defmodule Ootempl.Integration.RenderTest do
         "date" => "2025"
       }
 
-      output_path = "test/fixtures/header_error_output.docx"
+      output_path = "tmp/header_error_output.docx"
 
       on_exit(fn -> File.rm(output_path) end)
 
@@ -779,7 +779,7 @@ defmodule Ootempl.Integration.RenderTest do
     test "output can be opened in Microsoft Word (manual verification required)" do
       # Arrange
       template_path = @test_fixture
-      output_path = OotemplTestHelpers.tmp_path("manual_verification.docx")
+      output_path = "tmp/manual_verification.docx"
 
       data = %{
         "person" => %{"first_name" => "Marty McFly"},

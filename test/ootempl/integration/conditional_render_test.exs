@@ -13,7 +13,7 @@ defmodule Ootempl.Integration.ConditionalRenderTest do
 
   import Ootempl.FixtureHelper
 
-  @output_dir "test/fixtures/conditional_outputs"
+  @output_dir "tmp/conditional_outputs"
 
   setup_all do
     # Ensure output directory exists

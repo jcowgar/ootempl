@@ -7,13 +7,13 @@ defmodule Ootempl.Manual.HierarchicalTableManualTest do
 
       mix test test/ootempl/manual/hierarchical_table_manual_test.exs
 
-  Output files are saved to test/fixtures/manual/ and are NOT cleaned up
+  Output files are saved to tmp/manual/ and are NOT cleaned up
   automatically so you can inspect them.
   """
 
   use ExUnit.Case
 
-  @output_dir "test/fixtures/manual"
+  @output_dir "tmp/manual"
 
   setup_all do
     File.mkdir_p!(@output_dir)

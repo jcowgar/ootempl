@@ -11,7 +11,7 @@ defmodule Ootempl.Integration.CyrillicTextTest do
 
   alias Ootempl.Archive
 
-  @tmp_dir "test/fixtures/tmp_cyrillic_test"
+  @tmp_dir "tmp/cyrillic_test"
 
   setup do
     File.mkdir_p!(@tmp_dir)

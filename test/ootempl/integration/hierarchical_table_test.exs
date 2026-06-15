@@ -12,7 +12,7 @@ defmodule Ootempl.Integration.HierarchicalTableTest do
 
   @hierarchical_template_path "test/fixtures/table_hierarchical_generated.docx"
   @simple_block_template_path "test/fixtures/table_simple_block_generated.docx"
-  @output_path "test/fixtures/hierarchical_table_output.docx"
+  @output_path "tmp/hierarchical_table_output.docx"
 
   setup do
     # Create fixtures if they don't exist
@@ -354,7 +354,7 @@ defmodule Ootempl.Integration.HierarchicalTableTest do
   describe "error handling" do
     test "returns error for unmatched block markers" do
       # Create a template with unmatched markers
-      bad_template_path = "test/fixtures/bad_block_template.docx"
+      bad_template_path = "tmp/bad_block_template.docx"
 
       file_map = %{
         "[Content_Types].xml" => """
@@ -490,7 +490,7 @@ defmodule Ootempl.Integration.HierarchicalTableTest do
         ]
       }
 
-      manual_output_path = OotemplTestHelpers.tmp_path("hierarchical_table_manual.docx")
+      manual_output_path = "tmp/hierarchical_table_manual.docx"
 
       on_exit(fn -> :ok end)
 
