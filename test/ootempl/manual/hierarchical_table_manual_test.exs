@@ -13,6 +13,10 @@ defmodule Ootempl.Manual.HierarchicalTableManualTest do
 
   use ExUnit.Case
 
+  # These tests generate documents for a human to open in Word; excluded by
+  # default. Run them with `mix test --only manual`.
+  @moduletag :manual
+
   @output_dir "tmp/manual"
 
   setup_all do
