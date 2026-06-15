@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-15
+
 ### Added
 - Placeholder formatting filters (Jinja/Liquid style): `{{ value | filter: args | ... }}`
 - Built-in filters: `date`, `time`, `datetime`, `round`, `number`, `currency`,
@@ -14,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Register custom filters via application config (`config :ootempl, filters: %{...}`)
   or per call with the `:filters` option to `Ootempl.render/4`; both can override built-ins
 - New `Ootempl.Filters` module and `Ootempl.DataAccess.get_raw_value/2`
+- Default rendering for unfiltered values: `Date`, `Time`, `NaiveDateTime`, and
+  `DateTime` now format with ISO-style defaults (and other `String.Chars`
+  structs such as `Decimal` are supported) instead of erroring
 
 ## [0.2.0] - 2026-04-01
 
