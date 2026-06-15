@@ -573,4 +573,33 @@ defmodule Ootempl.DataAccessTest do
       assert result == {:ok, "9999999999999"}
     end
   end
+
+  describe "get_value/2 - default formatting of date/time and struct values" do
+    test "Date renders with an ISO default when no filter is applied" do
+      assert DataAccess.get_value(%{"d" => ~D[2026-06-15]}, ["d"]) == {:ok, "2026-06-15"}
+    end
+
+    test "Time renders with an ISO default" do
+      assert DataAccess.get_value(%{"t" => ~T[09:05:30]}, ["t"]) == {:ok, "09:05:30"}
+    end
+
+    test "NaiveDateTime renders with an ISO default" do
+      assert DataAccess.get_value(%{"dt" => ~N[2026-06-15 09:05:30]}, ["dt"]) ==
+               {:ok, "2026-06-15 09:05:30"}
+    end
+
+    test "DateTime renders with an ISO default (no trailing timezone)" do
+      {:ok, dt, _} = DateTime.from_iso8601("2026-06-15T09:05:30Z")
+      assert DataAccess.get_value(%{"dt" => dt}, ["dt"]) == {:ok, "2026-06-15 09:05:30"}
+    end
+
+    test "a struct implementing String.Chars uses it (e.g. Version, like Decimal would)" do
+      assert DataAccess.get_value(%{"v" => Version.parse!("1.2.3")}, ["v"]) == {:ok, "1.2.3"}
+    end
+
+    test "a struct without String.Chars is unsupported" do
+      assert DataAccess.get_value(%{"v" => MapSet.new([1, 2])}, ["v"]) ==
+               {:error, :unsupported_type}
+    end
+  end
 end

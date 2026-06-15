@@ -23,6 +23,39 @@ defmodule Ootempl.FixtureHelper do
     end
   end
 
+  @doc """
+  Creates a .docx file whose `word/document.xml` body is the given XML.
+
+  `body_xml` is the inner content of `<w:body>` (one or more paragraphs/tables).
+  Useful for exercising the full render pipeline against arbitrary placeholder
+  and filter syntax without authoring a Word document by hand.
+
+  Returns the path to the created fixture file.
+  """
+  @spec create_docx_with_body(Path.t(), String.t()) :: Path.t()
+  def create_docx_with_body(output_path, body_xml) do
+    document_xml = """
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+      <w:body>
+    #{body_xml}
+      </w:body>
+    </w:document>
+    """
+
+    file_map = %{
+      "[Content_Types].xml" => content_types_xml(),
+      "_rels/.rels" => rels_xml(),
+      "word/document.xml" => document_xml,
+      "word/_rels/document.xml.rels" => document_rels_xml()
+    }
+
+    case Ootempl.Archive.create(file_map, output_path) do
+      :ok -> output_path
+      {:error, reason} -> raise "Failed to create fixture: #{inspect(reason)}"
+    end
+  end
+
   defp content_types_xml do
     """
     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>

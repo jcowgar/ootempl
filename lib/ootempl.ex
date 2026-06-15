@@ -432,6 +432,7 @@ defmodule Ootempl do
   alias Ootempl.Archive
   alias Ootempl.Block
   alias Ootempl.Conditional
+  alias Ootempl.Filters
   alias Ootempl.Image
   alias Ootempl.Placeholder
   alias Ootempl.Relationships
@@ -744,6 +745,20 @@ defmodule Ootempl do
     - A `%Template{}` struct from `Ootempl.load/1` - skips loading/parsing (fast)
   - `data` - Map of data for placeholder replacement (string keys)
   - `output_path` - Path where the generated .docx file should be saved
+  - `opts` - Optional keyword list:
+    - `:filters` - Map of custom formatting filters (`%{"name" => fun/2}`) for
+      this render only. These are layered over the built-ins and any filters
+      configured via `config :ootempl, filters: %{...}`, and may override them.
+      See `Ootempl.Filters`.
+
+  ## Formatting filters
+
+  Placeholders may declare formatting filters Jinja/Liquid style:
+
+      {{ invoice.date | date: "%d %B %Y" }}
+      {{ total | round: 2 | currency: "USD" }}
+
+  See `Ootempl.Filters` for the built-in filters and how to register your own.
 
   ## Returns
 
@@ -806,25 +821,32 @@ defmodule Ootempl do
   - Nil values in data
   - Unsupported data types (maps, lists as values)
   """
-  @spec render(Path.t() | Template.t(), map() | struct(), Path.t()) :: :ok | {:error, term()}
-  def render(template, data, output_path)
+  @spec render(Path.t() | Template.t(), map() | struct(), Path.t(), keyword()) ::
+          :ok | {:error, term()}
+  def render(template, data, output_path, opts \\ [])
 
   # Pattern 1: Render from pre-loaded Template struct (optimized for batch processing)
-  def render(%Template{} = template, data, output_path) do
+  def render(%Template{} = template, data, output_path, opts) do
     with :ok <- validate_output_path(output_path) do
-      render_from_template(template, data, output_path)
+      Filters.with_registry(Filters.resolve(opts[:filters]), fn ->
+        render_from_template(template, data, output_path)
+      end)
     end
   end
 
   # Pattern 2: Render from file path (convenience API - loads template on each call)
-  def render(template_path, data, output_path) when is_binary(template_path) do
+  def render(template_path, data, output_path, opts) when is_binary(template_path) do
     with :ok <- validate_paths(template_path, output_path),
          :ok <- Validator.validate_docx(template_path) do
       # Extract template and ensure cleanup happens regardless of success or failure
       case Archive.extract(template_path) do
         {:ok, temp_dir} ->
           # Process template and always cleanup temp directory, even on error
-          result = process_template(temp_dir, data, output_path)
+          result =
+            Filters.with_registry(Filters.resolve(opts[:filters]), fn ->
+              process_template(temp_dir, data, output_path)
+            end)
+
           cleanup_result = Archive.cleanup(temp_dir)
 
           # Return original result or cleanup error
@@ -854,8 +876,7 @@ defmodule Ootempl do
 
     # Add headers
     header_elements =
-      template.headers
-      |> Enum.map(fn {filename, xml} ->
+      Enum.map(template.headers, fn {filename, xml} ->
         # Extract number from filename (e.g., "word/header1.xml" -> 1)
         number =
           filename
@@ -869,8 +890,7 @@ defmodule Ootempl do
 
     # Add footers
     footer_elements =
-      template.footers
-      |> Enum.map(fn {filename, xml} ->
+      Enum.map(template.footers, fn {filename, xml} ->
         number =
           filename
           |> Path.basename(".xml")
@@ -883,13 +903,15 @@ defmodule Ootempl do
 
     # Add optional elements
     optional_elements =
-      [
-        {template.footnotes, :footnotes},
-        {template.endnotes, :endnotes},
-        {template.core_properties, :properties},
-        {template.app_properties, :properties}
-      ]
-      |> Enum.reject(fn {xml, _location} -> is_nil(xml) end)
+      Enum.reject(
+        [
+          {template.footnotes, :footnotes},
+          {template.endnotes, :endnotes},
+          {template.core_properties, :properties},
+          {template.app_properties, :properties}
+        ],
+        fn {xml, _location} -> is_nil(xml) end
+      )
 
     all_elements = xml_elements ++ header_elements ++ footer_elements ++ optional_elements
 
@@ -1058,8 +1080,7 @@ defmodule Ootempl do
   defp build_template_info(file_inspections) do
     # Aggregate placeholders across all files
     all_placeholders =
-      file_inspections
-      |> Enum.flat_map(fn inspection ->
+      Enum.flat_map(file_inspections, fn inspection ->
         Enum.map(inspection.placeholders, fn ph ->
           Map.put(ph, :location, inspection.location)
         end)
@@ -1070,8 +1091,7 @@ defmodule Ootempl do
 
     # Aggregate conditionals across all files
     all_conditionals =
-      file_inspections
-      |> Enum.flat_map(fn inspection ->
+      Enum.flat_map(file_inspections, fn inspection ->
         # Only keep :if conditionals for the summary (not :else or :endif)
         inspection.conditionals
         |> Enum.filter(&(&1.type == :if))
@@ -1096,9 +1116,7 @@ defmodule Ootempl do
       |> Enum.sort()
 
     # Collect all errors
-    all_errors =
-      file_inspections
-      |> Enum.flat_map(& &1.errors)
+    all_errors = Enum.flat_map(file_inspections, & &1.errors)
 
     # Determine validity
     valid? = Enum.empty?(all_errors)
@@ -1736,10 +1754,10 @@ defmodule Ootempl do
           {:ok, Xml.xml_element()} | {:error, term()}
   defp process_block_table(table, rows, data, xml_doc) do
     with {:ok, structure} <- Block.parse_table_structure(rows, data),
-         expanded <- Block.expand_block(structure, rows, data),
-         {:ok, replaced_rows} <- replace_placeholders_in_expanded_rows(expanded),
-         block_row_range <- {structure.open_row_index, structure.close_row_index},
-         new_table <- rebuild_table_with_expanded_rows(table, rows, replaced_rows, block_row_range) do
+         expanded = Block.expand_block(structure, rows, data),
+         {:ok, replaced_rows} <- replace_placeholders_in_expanded_rows(expanded) do
+      block_row_range = {structure.open_row_index, structure.close_row_index}
+      new_table = rebuild_table_with_expanded_rows(table, rows, replaced_rows, block_row_range)
       replace_table_in_doc(xml_doc, table, new_table)
     end
   end
@@ -1895,15 +1913,21 @@ defmodule Ootempl do
         case status do
           :ok ->
             case duplicate_and_replace_group(group, data, acc_table) do
-              {:ok, new_table} -> {:ok, new_table, acc_errors}
-              {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} -> {:error, acc_table, acc_errors ++ placeholders}
+              {:ok, new_table} ->
+                {:ok, new_table, acc_errors}
+
+              {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} ->
+                {:error, acc_table, acc_errors ++ placeholders}
             end
 
           :error ->
             # Continue processing to collect all errors
             case duplicate_and_replace_group(group, data, acc_table) do
-              {:ok, new_table} -> {:error, new_table, acc_errors}
-              {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} -> {:error, acc_table, acc_errors ++ placeholders}
+              {:ok, new_table} ->
+                {:error, new_table, acc_errors}
+
+              {:error, %Ootempl.PlaceholderError{placeholders: placeholders}} ->
+                {:error, acc_table, acc_errors ++ placeholders}
             end
         end
       end)

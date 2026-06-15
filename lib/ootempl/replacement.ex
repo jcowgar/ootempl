@@ -43,6 +43,7 @@ defmodule Ootempl.Replacement do
   import Ootempl.Xml
 
   alias Ootempl.DataAccess
+  alias Ootempl.Filters
   alias Ootempl.Placeholder
   alias Ootempl.PlaceholderError
 
@@ -95,10 +96,10 @@ defmodule Ootempl.Replacement do
           #      placeholders: [%{placeholder: "{{missing}}", reason: {:path_not_found, ["missing"]}}]
           #    }}
   """
-  @spec replace_in_document(xml_element(), map()) ::
+  @spec replace_in_document(xml_element(), map(), Filters.registry()) ::
           {:ok, xml_element()} | {:error, PlaceholderError.t()}
-  def replace_in_document(xml_element, data) when is_map(data) do
-    case traverse_and_replace(xml_element, data) do
+  def replace_in_document(xml_element, data, filters \\ Filters.active_registry()) when is_map(data) do
+    case traverse_and_replace(xml_element, data, filters) do
       {:ok, modified, []} ->
         {:ok, modified}
 
@@ -114,16 +115,16 @@ defmodule Ootempl.Replacement do
     end
   end
 
-  @spec replace_in_text_node(xml_text(), map()) ::
+  @spec replace_in_text_node(xml_text(), map(), Filters.registry()) ::
           {:ok, xml_text(), [{String.t(), DataAccess.error_reason()}]}
-  defp replace_in_text_node(text_node, data) do
+  defp replace_in_text_node(text_node, data, filters) do
     text = text_node |> xmlText(:value) |> List.to_string()
     placeholders = Placeholder.detect(text)
 
     # Collect all replacement results
     {modified_text, errors} =
       Enum.reduce(placeholders, {text, []}, fn placeholder, {current_text, acc_errors} ->
-        case DataAccess.get_value(data, placeholder.path) do
+        case resolve_value(data, placeholder, filters) do
           {:ok, value} ->
             escaped_value = xml_escape(value)
             new_text = String.replace(current_text, placeholder.original, escaped_value)
@@ -150,6 +151,17 @@ defmodule Ootempl.Replacement do
     end
   end
 
+  # Resolves a placeholder to its final string value: fetch the raw value,
+  # run it through the filter chain, then convert the result to a string.
+  @spec resolve_value(map(), Placeholder.placeholder(), Filters.registry()) ::
+          {:ok, String.t()} | {:error, term()}
+  defp resolve_value(data, placeholder, filters) do
+    with {:ok, raw} <- DataAccess.get_raw_value(data, placeholder.path),
+         {:ok, filtered} <- Filters.apply_chain(raw, placeholder.filters, filters) do
+      DataAccess.to_string_value(filtered)
+    end
+  end
+
   @spec unescape_braces(String.t()) :: String.t()
   defp unescape_braces(text) when is_binary(text) do
     text
@@ -169,15 +181,15 @@ defmodule Ootempl.Replacement do
 
   # Private functions
 
-  @spec traverse_and_replace(xml_element(), map()) ::
+  @spec traverse_and_replace(xml_element(), map(), Filters.registry()) ::
           {:ok, xml_element(), [{String.t(), DataAccess.error_reason()}]}
-  defp traverse_and_replace(element, data) do
+  defp traverse_and_replace(element, data, filters) do
     content = xmlElement(element, :content)
 
     # Process all child nodes and collect errors
     {modified_content, all_errors} =
       Enum.reduce(content, {[], []}, fn node, {acc_content, acc_errors} ->
-        {:ok, modified_node, node_errors} = process_node(node, data)
+        {:ok, modified_node, node_errors} = process_node(node, data, filters)
         {[modified_node | acc_content], acc_errors ++ node_errors}
       end)
 
@@ -188,15 +200,15 @@ defmodule Ootempl.Replacement do
     {:ok, modified_element, all_errors}
   end
 
-  @spec process_node(xml_node(), map()) ::
+  @spec process_node(xml_node(), map(), Filters.registry()) ::
           {:ok, xml_node(), [{String.t(), DataAccess.error_reason()}]}
-  defp process_node(node, data) do
+  defp process_node(node, data, filters) do
     cond do
       Record.is_record(node, :xmlText) ->
-        replace_in_text_node(node, data)
+        replace_in_text_node(node, data, filters)
 
       Record.is_record(node, :xmlElement) ->
-        traverse_and_replace(node, data)
+        traverse_and_replace(node, data, filters)
 
       true ->
         # Other node types (comments, etc.) pass through unchanged

@@ -89,13 +89,88 @@ defmodule Ootempl.DataAccess do
     end
   end
 
+  @doc """
+  Retrieves the raw (un-stringified) value from nested data using a path.
+
+  Unlike `get_value/2`, this returns the value with its original Elixir type
+  intact (e.g. a `%Date{}` stays a `%Date{}`, a number stays a number, `nil`
+  is returned as `{:ok, nil}`). This is used by the filter pipeline so that
+  filters can operate on real types before the value is converted to a string.
+
+  ## Parameters
+
+    - `data` - The data structure to traverse (map or list)
+    - `path` - List of path segments to navigate
+
+  ## Returns
+
+    - `{:ok, term}` - The raw value
+    - `{:error, reason}` - Error with details about what went wrong
+
+  ## Examples
+
+      iex> Ootempl.DataAccess.get_raw_value(%{"count" => 5}, ["count"])
+      {:ok, 5}
+
+      iex> Ootempl.DataAccess.get_raw_value(%{"name" => nil}, ["name"])
+      {:ok, nil}
+
+      iex> Ootempl.DataAccess.get_raw_value(%{}, ["missing"])
+      {:error, {:path_not_found, ["missing"]}}
+  """
+  @spec get_raw_value(data(), path()) :: {:ok, term()} | {:error, error_reason()}
+  def get_raw_value(data, path) when is_list(path) do
+    traverse(data, path, path)
+  end
+
+  # Default formats applied to date/time values rendered without a filter.
+  # These mirror the defaults of the `date`, `time`, and `datetime` filters in
+  # `Ootempl.Filters` so a bare `{{date}}` and `{{date | date}}` agree.
+  @default_date_format "%Y-%m-%d"
+  @default_time_format "%H:%M:%S"
+  @default_datetime_format "%Y-%m-%d %H:%M:%S"
+
+  @doc """
+  Converts a resolved value to its string representation for the document.
+
+  Every value type we support has a sensible default rendering, so a value
+  used without a formatting filter still produces output:
+
+    - binaries are used as-is
+    - numbers and booleans are stringified
+    - `Date`, `Time`, `NaiveDateTime`, and `DateTime` use ISO-style defaults
+      (matching the `date`/`time`/`datetime` filters)
+    - any other struct implementing `String.Chars` (e.g. `Decimal`) uses it
+
+  Returns `{:error, :nil_value}` for `nil`, and `{:error, :unsupported_type}`
+  for values with no string representation (maps, lists, structs that don't
+  implement `String.Chars`) — these usually indicate a path that stopped short
+  of a leaf value.
+  """
   @spec to_string_value(term()) :: {:ok, String.t()} | {:error, :nil_value | :unsupported_type}
-  defp to_string_value(value) when is_binary(value), do: {:ok, value}
-  defp to_string_value(value) when is_number(value), do: {:ok, to_string(value)}
-  defp to_string_value(true), do: {:ok, "true"}
-  defp to_string_value(false), do: {:ok, "false"}
-  defp to_string_value(nil), do: {:error, :nil_value}
-  defp to_string_value(_), do: {:error, :unsupported_type}
+  def to_string_value(value) when is_binary(value), do: {:ok, value}
+  def to_string_value(value) when is_number(value), do: {:ok, to_string(value)}
+  def to_string_value(true), do: {:ok, "true"}
+  def to_string_value(false), do: {:ok, "false"}
+  def to_string_value(nil), do: {:error, :nil_value}
+  def to_string_value(%Date{} = value), do: {:ok, Calendar.strftime(value, @default_date_format)}
+  def to_string_value(%Time{} = value), do: {:ok, Calendar.strftime(value, @default_time_format)}
+
+  def to_string_value(%NaiveDateTime{} = value), do: {:ok, Calendar.strftime(value, @default_datetime_format)}
+
+  def to_string_value(%DateTime{} = value), do: {:ok, Calendar.strftime(value, @default_datetime_format)}
+
+  def to_string_value(value) when is_struct(value), do: stringify_struct(value)
+  def to_string_value(_), do: {:error, :unsupported_type}
+
+  # Falls back to the String.Chars protocol for structs that implement it
+  # (Decimal, Money, etc.), and reports unsupported types for those that don't.
+  @spec stringify_struct(struct()) :: {:ok, String.t()} | {:error, :unsupported_type}
+  defp stringify_struct(value) do
+    {:ok, String.Chars.to_string(value)}
+  rescue
+    Protocol.UndefinedError -> {:error, :unsupported_type}
+  end
 
   # Private functions
 
