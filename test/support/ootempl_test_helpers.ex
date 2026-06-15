@@ -7,6 +7,20 @@ defmodule OotemplTestHelpers do
   """
 
   @doc """
+  Returns a path under the repo's git-ignored `tmp/` directory, creating the
+  directory if needed.
+
+  Use this for any file a test generates (rendered documents, manual
+  verification outputs) so generated artifacts never land in `test/fixtures/`,
+  which is reserved for hand-crafted input fixtures.
+  """
+  @spec tmp_path(String.t()) :: Path.t()
+  def tmp_path(name) do
+    File.mkdir_p!("tmp")
+    Path.join("tmp", name)
+  end
+
+  @doc """
   Extracts a specific file from a .docx archive for testing purposes.
 
   Uses the public `Archive.extract/1` API to extract the entire archive,

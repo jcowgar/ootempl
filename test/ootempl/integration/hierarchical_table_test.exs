@@ -490,7 +490,7 @@ defmodule Ootempl.Integration.HierarchicalTableTest do
         ]
       }
 
-      manual_output_path = "test/fixtures/hierarchical_table_manual.docx"
+      manual_output_path = OotemplTestHelpers.tmp_path("hierarchical_table_manual.docx")
 
       on_exit(fn -> :ok end)
 

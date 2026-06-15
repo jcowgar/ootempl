@@ -15,7 +15,6 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
 
   @template_path "test/fixtures/Table Repeating Rows from Word.docx"
   @output_path "test/fixtures/table_repeating_word_output.docx"
-  @manual_output_path "test/fixtures/table_repeating_word_manual.docx"
 
   setup do
     on_exit(fn ->
@@ -328,16 +327,17 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
         "average_age" => "34.2"
       }
 
-      # Don't clean up this file - leave it for manual verification
+      # Generated output goes to the git-ignored tmp/ dir, left for manual review
+      manual_output_path = OotemplTestHelpers.tmp_path("table_repeating_word_manual.docx")
       on_exit(fn -> :ok end)
 
       # Act
-      result = Ootempl.render(@template_path, data, @manual_output_path)
+      result = Ootempl.render(@template_path, data, manual_output_path)
 
       # Assert
       assert result == :ok
-      assert File.exists?(@manual_output_path)
-      assert :ok = Ootempl.Validator.validate_docx(@manual_output_path)
+      assert File.exists?(manual_output_path)
+      assert :ok = Ootempl.Validator.validate_docx(manual_output_path)
 
       IO.puts("""
 
@@ -346,7 +346,7 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       ========================================
 
       Template: #{Path.basename(@template_path)}
-      Output:   #{Path.expand(@manual_output_path)}
+      Output:   #{Path.expand(manual_output_path)}
 
       Test Data Used:
       ---------------

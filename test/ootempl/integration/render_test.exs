@@ -779,7 +779,7 @@ defmodule Ootempl.Integration.RenderTest do
     test "output can be opened in Microsoft Word (manual verification required)" do
       # Arrange
       template_path = @test_fixture
-      output_path = "test/fixtures/manual_verification.docx"
+      output_path = OotemplTestHelpers.tmp_path("manual_verification.docx")
 
       data = %{
         "person" => %{"first_name" => "Marty McFly"},
