@@ -175,14 +175,11 @@ defmodule Ootempl.Integration.RenderTest do
       # XML should be well-formed (escaped properly)
       assert {:ok, _parsed} = Ootempl.Xml.parse(output_xml)
 
-      # Values should be escaped (double-escaped in serialized XML)
-      # Our code escapes once, then xmerl escapes again during serialization
-      # & -> &amp; -> &amp;amp;
-      assert output_xml =~ "&amp;amp;"
-      # < -> &lt; -> &amp;lt;
-      assert output_xml =~ "&amp;lt;"
-      # > -> &gt; -> &amp;gt;
-      assert output_xml =~ "&amp;gt;"
+      # Values should be escaped exactly once, so Word shows them as typed
+      assert output_xml =~ "Doc &amp; Marty"
+      assert output_xml =~ "&lt;Back to the Future&gt;"
+      refute output_xml =~ "&amp;amp;"
+      refute output_xml =~ "&amp;lt;"
     end
   end
 

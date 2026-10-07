@@ -156,16 +156,15 @@ defmodule Ootempl.Integration.FiltersRenderTest do
   describe "XML escaping of filter output" do
     test "special characters produced by a filter are XML-escaped in the output" do
       # A filter that emits a raw ampersand; the pipeline must escape it so the
-      # output stays valid XML. Filter output goes through the same escaping as
-      # substituted data values, which this codebase double-escapes
-      # (& -> &amp; -> &amp;amp;); see RenderTest for the documented behavior.
+      # output stays valid XML, and escape it exactly once.
       body = ~S(<w:p><w:r><w:t>{{x | amp}}</w:t></w:r></w:p>)
       filters = %{"amp" => fn _v, _ -> {:ok, "A & B"} end}
 
       xml = render_body(body, %{"x" => "z"}, filters: filters)
 
       assert {:ok, _parsed} = Ootempl.Xml.parse(xml)
-      assert xml =~ "A &amp;amp; B"
+      assert xml =~ "A &amp; B"
+      refute xml =~ "&amp;amp;"
     end
   end
 end

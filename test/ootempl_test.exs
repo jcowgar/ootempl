@@ -834,8 +834,9 @@ defmodule OotemplTest do
       # Assert
       assert result == :ok
       {:ok, output_xml} = OotemplTestHelpers.extract_file_for_test(output_path, "word/document.xml")
-      # XML special characters should be escaped
-      assert output_xml =~ "&amp;lt;&amp;gt;&amp;amp;"
+      # XML special characters should be escaped exactly once
+      assert output_xml =~ "&lt;&gt;&amp;"
+      refute output_xml =~ "&amp;amp;"
       refute output_xml =~ "<>&\"'"
 
       # Cleanup

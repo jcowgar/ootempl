@@ -177,11 +177,11 @@ defmodule Ootempl.Integration.TableRepeatingWordTest do
       # XML should be well-formed
       assert {:ok, _parsed} = Ootempl.Xml.parse(output_xml)
 
-      # Special chars should be escaped in XML
-      # Apostrophe gets escaped to &apos; (which appears as &amp;apos; in serialized XML)
-      assert output_xml =~ "&amp;apos;"
-      # & should be double-escaped in the serialized XML
-      assert output_xml =~ "&amp;amp;"
+      # Special chars should be escaped exactly once; apostrophes need no escaping
+      assert output_xml =~ "O'Brien"
+      assert output_xml =~ "Smith &amp; Associates"
+      refute output_xml =~ "&amp;amp;"
+      refute output_xml =~ "&amp;apos;"
       # Hyphen is allowed as-is in XML
       assert output_xml =~ "Jean-Luc"
     end

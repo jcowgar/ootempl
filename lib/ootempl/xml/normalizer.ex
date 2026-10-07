@@ -36,12 +36,6 @@ defmodule Ootempl.Xml.Normalizer do
 
   require Record
 
-  # Add xmlNamespace record definition
-  Record.defrecord(
-    :xmlNamespace,
-    Record.extract(:xmlNamespace, from_lib: "xmerl/include/xmerl.hrl")
-  )
-
   @doc """
   Normalizes an XML document by collapsing fragmented placeholders.
 
@@ -85,8 +79,10 @@ defmodule Ootempl.Xml.Normalizer do
   @spec normalize_paragraph(Ootempl.Xml.xml_element()) :: Ootempl.Xml.xml_element()
   defp normalize_paragraph(paragraph) do
     content = xmlElement(paragraph, :content)
-    # Filter out proofing errors
-    filtered_content = Enum.reject(content, &proofing_error?/1)
+    # Filter out proofing errors and inter-element whitespace (paragraphs hold
+    # no meaningful character data of their own; it only appears when the XML
+    # is pretty-printed and would otherwise split a placeholder span)
+    filtered_content = Enum.reject(content, &(proofing_error?(&1) or whitespace_text?(&1)))
     # Process content to find and collapse placeholders
     normalized_content = process_runs_for_placeholders(filtered_content, [])
     xmlElement(paragraph, content: normalized_content)
@@ -99,9 +95,9 @@ defmodule Ootempl.Xml.Normalizer do
 
   defp process_runs_for_placeholders(nodes, acc) do
     case find_placeholder_span(nodes) do
-      {:found, placeholder_text, _span_runs, remaining_nodes, consistent_props} ->
+      {:found, _placeholder_text, span_runs, remaining_nodes, consistent_props} ->
         # Create collapsed run with appropriate formatting
-        collapsed_run = create_collapsed_run(placeholder_text, consistent_props)
+        collapsed_run = create_collapsed_run(span_runs, consistent_props)
         process_runs_for_placeholders(remaining_nodes, [collapsed_run | acc])
 
       {:no_placeholder, first_node, rest} ->
@@ -286,39 +282,76 @@ defmodule Ootempl.Xml.Normalizer do
     end)
   end
 
-  @spec create_collapsed_run(String.t(), Ootempl.Xml.xml_element() | nil) ::
+  # Collapses the runs of a placeholder span into one run. Each run's
+  # non-property children (tabs, breaks, etc.) are kept in order; only
+  # adjacent <w:t> elements are merged, so a placeholder fragmented across
+  # runs ends up in a single text node. The first run is used as the template
+  # so its attributes are kept.
+  @spec create_collapsed_run([Ootempl.Xml.xml_element()], Ootempl.Xml.xml_element() | nil) ::
           Ootempl.Xml.xml_element()
-  defp create_collapsed_run(text, run_props) do
-    # Create text node
+  defp create_collapsed_run([first_run | _] = span_runs, run_props) do
+    children =
+      span_runs
+      |> Enum.flat_map(fn run ->
+        run |> xmlElement(:content) |> Enum.reject(&run_properties?/1)
+      end)
+      |> merge_adjacent_text_elements()
+
+    run_content = if run_props, do: [run_props | children], else: children
+
+    xmlElement(first_run, content: run_content)
+  end
+
+  @spec merge_adjacent_text_elements([Ootempl.Xml.xml_node()]) :: [Ootempl.Xml.xml_node()]
+  defp merge_adjacent_text_elements(nodes) do
+    nodes
+    |> Enum.chunk_by(&text_element?/1)
+    |> Enum.flat_map(fn
+      [first | _] = text_elements when length(text_elements) > 1 ->
+        if text_element?(first), do: [merge_text_elements(text_elements)], else: text_elements
+
+      single ->
+        single
+    end)
+  end
+
+  # Joins several <w:t> elements into the first one. The merged text may begin
+  # or end with whitespace that came from any fragment, so it is always marked
+  # xml:space="preserve"; without it Word trims that whitespace.
+  @spec merge_text_elements([Ootempl.Xml.xml_element()]) :: Ootempl.Xml.xml_element()
+  defp merge_text_elements([first | _] = text_elements) do
+    text = Enum.map_join(text_elements, &text_element_value/1)
     text_node = xmlText(value: String.to_charlist(text))
 
-    # Create w:t element containing the text
-    text_element =
-      xmlElement(
-        name: :"w:t",
-        content: [text_node],
-        attributes: [],
-        expanded_name: :"w:t",
-        nsinfo: {~c"w", ~c"t"},
-        namespace: xmlNamespace(nodes: [{~c"w", ~c"http://schemas.openxmlformats.org/wordprocessingml/2006/main"}])
-      )
+    attributes =
+      first
+      |> xmlElement(:attributes)
+      |> Enum.reject(&(xmlAttribute(&1, :name) == :"xml:space"))
+      |> Kernel.++([xmlAttribute(name: :"xml:space", nsinfo: {~c"xml", ~c"space"}, value: ~c"preserve")])
 
-    # Build run content: [rPr (optional), w:t]
-    run_content =
-      if run_props do
-        [run_props, text_element]
-      else
-        [text_element]
-      end
+    xmlElement(first, content: [text_node], attributes: attributes)
+  end
 
-    # Create w:r element
-    xmlElement(
-      name: :"w:r",
-      content: run_content,
-      attributes: [],
-      expanded_name: :"w:r",
-      nsinfo: {~c"w", ~c"r"},
-      namespace: xmlNamespace(nodes: [{~c"w", ~c"http://schemas.openxmlformats.org/wordprocessingml/2006/main"}])
-    )
+  @spec text_element_value(Ootempl.Xml.xml_element()) :: String.t()
+  defp text_element_value(text_element) do
+    text_element
+    |> xmlElement(:content)
+    |> Enum.filter(&Record.is_record(&1, :xmlText))
+    |> Enum.map_join(&List.to_string(xmlText(&1, :value)))
+  end
+
+  @spec text_element?(Ootempl.Xml.xml_node()) :: boolean()
+  defp text_element?(node) do
+    element_node?(node) && xmlElement(node, :name) == :"w:t"
+  end
+
+  @spec run_properties?(Ootempl.Xml.xml_node()) :: boolean()
+  defp run_properties?(node) do
+    element_node?(node) && xmlElement(node, :name) == :"w:rPr"
+  end
+
+  @spec whitespace_text?(Ootempl.Xml.xml_node()) :: boolean()
+  defp whitespace_text?(node) do
+    Record.is_record(node, :xmlText) && node |> xmlText(:value) |> List.to_string() |> String.trim() == ""
   end
 end

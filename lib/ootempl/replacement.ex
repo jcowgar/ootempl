@@ -7,7 +7,7 @@ defmodule Ootempl.Replacement do
   XML structure, including:
 
   - Preserving Word formatting (bold, italic, font, size, color)
-  - XML-escaping replacement values to prevent corruption
+  - Storing replacement values as raw text (xmerl escapes them on serialization)
   - Unescaping literal `\{{` and `\}}` sequences to `{{` and `}}`
   - Collecting all errors for batch reporting
 
@@ -126,8 +126,8 @@ defmodule Ootempl.Replacement do
       Enum.reduce(placeholders, {text, []}, fn placeholder, {current_text, acc_errors} ->
         case resolve_value(data, placeholder, filters) do
           {:ok, value} ->
-            escaped_value = xml_escape(value)
-            new_text = String.replace(current_text, placeholder.original, escaped_value)
+            # The value is stored as raw text; xmerl escapes it on export
+            new_text = String.replace(current_text, placeholder.original, value)
             {new_text, acc_errors}
 
           {:error, reason} ->
@@ -167,16 +167,6 @@ defmodule Ootempl.Replacement do
     text
     |> String.replace("\\{{", "{{")
     |> String.replace("\\}}", "}}")
-  end
-
-  @spec xml_escape(String.t()) :: String.t()
-  defp xml_escape(value) when is_binary(value) do
-    value
-    |> String.replace("&", "&amp;")
-    |> String.replace("<", "&lt;")
-    |> String.replace(">", "&gt;")
-    |> String.replace("\"", "&quot;")
-    |> String.replace("'", "&apos;")
   end
 
   # Private functions

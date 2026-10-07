@@ -402,8 +402,8 @@ defmodule Ootempl.XmlTest do
 
       # Assert
       assert is_binary(xml_string)
-      # Special characters should be escaped in the output
-      assert xml_string =~ "test"
+      # Special characters should be escaped exactly once in the output
+      assert xml_string =~ "<test>&lt;&gt;&amp;\"'</test>"
     end
 
     test "handles serialization with Unicode characters" do

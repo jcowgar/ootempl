@@ -81,9 +81,8 @@ defmodule Ootempl.Integration.HierarchicalTableTest do
       assert output_xml =~ "$8,000"
 
       # Verify second parent (30X Room & Board)
-      # Note: & is escaped to &amp; in XML, which appears as &amp;amp; in serialized XML string
       assert output_xml =~ "30X"
-      assert output_xml =~ "Room &amp;amp; Board"
+      assert output_xml =~ "Room &amp; Board"
       assert output_xml =~ "$2,000"
 
       # Verify second parent's children
