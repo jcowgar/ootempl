@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
 ### Added
 - Inline conditionals: `{{if}}`/`{{else}}`/`{{endif}}` within a single paragraph
   show or hide just the text between them
