@@ -169,6 +169,9 @@ defmodule Ootempl.PlaceholderError do
   - `{:not_a_list, value}` - Tried to index into a non-list value
   - `:nil_value` - Data path exists but value is nil
   - `{:unsupported_type, type}` - Value type cannot be converted to string
+  - `:split_placeholder` - The placeholder is split across document structure
+    (e.g. partly inside a hyperlink) and cannot be replaced; retype it in the
+    template so it sits in one place
   """
   defexception [:message, :placeholders]
 

@@ -34,6 +34,13 @@ defmodule Ootempl.FixtureHelper do
   """
   @spec create_docx_with_body(Path.t(), String.t()) :: Path.t()
   def create_docx_with_body(output_path, body_xml) do
+    case Ootempl.Archive.create(body_file_map(body_xml), output_path) do
+      :ok -> output_path
+      {:error, reason} -> raise "Failed to create fixture: #{inspect(reason)}"
+    end
+  end
+
+  defp body_file_map(body_xml) do
     document_xml = """
     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -43,14 +50,23 @@ defmodule Ootempl.FixtureHelper do
     </w:document>
     """
 
-    file_map = %{
+    %{
       "[Content_Types].xml" => content_types_xml(),
       "_rels/.rels" => rels_xml(),
       "word/document.xml" => document_xml,
       "word/_rels/document.xml.rels" => document_rels_xml()
     }
+  end
 
-    case Ootempl.Archive.create(file_map, output_path) do
+  @doc """
+  Creates a minimal .docx whose body is `body_xml`, plus extra package parts
+  (headers, footers, footnotes, ...) given as a map of path => full XML.
+
+  Returns the path to the created fixture file.
+  """
+  @spec create_docx_with_parts(Path.t(), String.t(), %{String.t() => String.t()}) :: Path.t()
+  def create_docx_with_parts(output_path, body_xml, parts) do
+    case Ootempl.Archive.create(Map.merge(body_file_map(body_xml), parts), output_path) do
       :ok -> output_path
       {:error, reason} -> raise "Failed to create fixture: #{inspect(reason)}"
     end

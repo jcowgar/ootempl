@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Inline conditionals: `{{if}}`/`{{else}}`/`{{endif}}` within a single paragraph
+  show or hide just the text between them
+- Line breaks (`\n`, `\r\n`, `\r`) and tabs in substituted values render as
+  Word line breaks and tabs instead of spaces
+- `:split_placeholder` placeholder error for placeholders split across document
+  structure (e.g. partly inside a hyperlink), which were previously left in the
+  output unreplaced
+- `Ootempl.Conditional.detect_markers/1` and `Ootempl.Xml.put_text/2`
+
+### Changed
+- **Breaking:** substituted values are XML-escaped once. Values containing
+  `&`, `<`, `>`, `'` or `"` previously rendered as `&amp;`, `&lt;`, etc. in
+  Word; callers that worked around this should drop their workarounds
+- Fragmented placeholders are normalized by moving the placeholder into the
+  run where it starts instead of merging runs, so surrounding text keeps its
+  own formatting
+- A multi-paragraph conditional whose marker shares a paragraph with other
+  text now returns an error instead of deleting that text
+
+### Fixed
+- Leading/trailing spaces lost around substituted values (`xml:space="preserve"`
+  dropped or not added) (MS-1524)
+- Tabs, line breaks, symbols and other run content deleted from runs
+  containing a placeholder
+- Placeholders fragmented across runs inside hyperlinks, tracked insertions,
+  smart tags or content controls, or separated by bookmarks or whitespace,
+  were not replaced
+- Inline conditionals deleted their whole paragraph
+- Conditions garbled by multi-byte characters (e.g. `’`, `é`) earlier in the
+  document
+- Paragraph-level markers with different case or extra spaces (`{{IF  x}}`)
+  failed to process despite being documented as supported
+- Paragraph-level conditionals in headers and footers raised an exception
+- A hidden section filling a table cell left the cell without a paragraph,
+  producing an invalid document
+
 ## [0.3.0] - 2026-06-15
 
 ### Added

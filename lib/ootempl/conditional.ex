@@ -41,6 +41,14 @@ defmodule Ootempl.Conditional do
           position: integer()
         }
 
+  @type marker :: %{
+          type: :if | :else | :endif,
+          condition: String.t() | nil,
+          path: [String.t()] | nil,
+          position: non_neg_integer(),
+          length: pos_integer()
+        }
+
   @if_pattern ~r/(?<!\\)\{\{if\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/i
   @else_pattern ~r/(?<!\\)\{\{else\}\}/i
   @endif_pattern ~r/(?<!\\)\{\{endif\}\}/i
@@ -82,6 +90,24 @@ defmodule Ootempl.Conditional do
   """
   @spec detect_conditionals(String.t()) :: [conditional()]
   def detect_conditionals(text) when is_binary(text) do
+    text
+    |> detect_markers()
+    |> Enum.map(&Map.delete(&1, :length))
+  end
+
+  @doc """
+  Like `detect_conditionals/1`, but each marker also carries its `:length`.
+
+  `:position` and `:length` are byte offsets into `text`, so a marker's text is
+  `binary_part(text, position, length)`.
+
+  ## Examples
+
+      iex> Ootempl.Conditional.detect_markers("Café {{IF vip}}!")
+      [%{type: :if, condition: "vip", path: ["vip"], position: 6, length: 10}]
+  """
+  @spec detect_markers(String.t()) :: [marker()]
+  def detect_markers(text) when is_binary(text) do
     if_markers = find_if_markers(text)
     else_markers = find_else_markers(text)
     endif_markers = find_endif_markers(text)
@@ -283,47 +309,51 @@ defmodule Ootempl.Conditional do
 
   # Private helper functions
 
-  @spec find_if_markers(String.t()) :: [conditional()]
+  @spec find_if_markers(String.t()) :: [marker()]
   defp find_if_markers(text) do
     @if_pattern
     |> Regex.scan(text, return: :index)
-    |> Enum.map(fn [{position, _length}, {cond_start, cond_length}] ->
-      condition = String.slice(text, cond_start, cond_length)
+    |> Enum.map(fn [{position, length}, {cond_start, cond_length}] ->
+      # Regex indexes are byte offsets
+      condition = binary_part(text, cond_start, cond_length)
       path = parse_condition(condition)
 
       %{
         type: :if,
         condition: condition,
         path: path,
-        position: position
+        position: position,
+        length: length
       }
     end)
   end
 
-  @spec find_else_markers(String.t()) :: [conditional()]
+  @spec find_else_markers(String.t()) :: [marker()]
   defp find_else_markers(text) do
     @else_pattern
     |> Regex.scan(text, return: :index)
-    |> Enum.map(fn [{position, _length}] ->
+    |> Enum.map(fn [{position, length}] ->
       %{
         type: :else,
         condition: nil,
         path: nil,
-        position: position
+        position: position,
+        length: length
       }
     end)
   end
 
-  @spec find_endif_markers(String.t()) :: [conditional()]
+  @spec find_endif_markers(String.t()) :: [marker()]
   defp find_endif_markers(text) do
     @endif_pattern
     |> Regex.scan(text, return: :index)
-    |> Enum.map(fn [{position, _length}] ->
+    |> Enum.map(fn [{position, length}] ->
       %{
         type: :endif,
         condition: nil,
         path: nil,
-        position: position
+        position: position,
+        length: length
       }
     end)
   end

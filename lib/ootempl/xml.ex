@@ -152,6 +152,36 @@ defmodule Ootempl.Xml do
     xmlElement(element, content: filtered_content)
   end
 
+  @doc """
+  Replaces the text of a `<w:t>` element.
+
+  The element is marked `xml:space="preserve"` when the text begins or ends
+  with whitespace; without it Word trims that whitespace.
+
+  ## Examples
+
+      iex> {:ok, t} = Ootempl.Xml.parse("<w:t>old</w:t>")
+      iex> {:ok, xml} = t |> Ootempl.Xml.put_text("new ") |> Ootempl.Xml.serialize()
+      iex> xml =~ ~s(<w:t xml:space="preserve">new </w:t>)
+      true
+  """
+  @spec put_text(xml_element(), String.t()) :: xml_element()
+  def put_text(text_element, text) when is_binary(text) do
+    text_element = xmlElement(text_element, content: [xmlText(value: String.to_charlist(text))])
+
+    if String.trim(text) == text do
+      text_element
+    else
+      attributes =
+        text_element
+        |> xmlElement(:attributes)
+        |> Enum.reject(&(xmlAttribute(&1, :name) == :"xml:space"))
+        |> Kernel.++([xmlAttribute(name: :"xml:space", nsinfo: {~c"xml", ~c"space"}, value: ~c"preserve")])
+
+      xmlElement(text_element, attributes: attributes)
+    end
+  end
+
   # Private helpers
 
   # Filters nodes and recursively processes element children
